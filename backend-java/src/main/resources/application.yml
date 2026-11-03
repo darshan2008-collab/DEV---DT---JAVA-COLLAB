@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: smart-ambulance-backend
+  profiles:
+    active: local
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+smartambulance:
+  jwt:
+    secret: "smart-ambulance-super-secret-key-for-jwt-tokens-at-least-256-bits-long!"
+    expiration-ms: 86400000 # 24 hours
+  preprocessing:
+    min-confidence: 0.5
+    speed-outlier-multiplier: 1.5
+    max-interpolation-gap-seconds: 120
+    median-window-size: 5
+    default-speed-ratio-thresholds:
+      low: 0.8
+      medium: 0.6
+      high: 0.4
+      critical: 0.2
+  routing:
+    hysteresis-margin-minutes: 1.0
+    stale-data-timeout-seconds: 120
+    default-algorithm: "DIJKSTRA"
+    signal-delay-minutes: 0.25
+  mqtt:
+    enabled: true
+    broker-url: "tcp://localhost:1883"
+    client-id: "smart-ambulance-backend"
+    qos: 1
+    connection-timeout-seconds: 3
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:smartambulancedb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ""
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:smartambulance}
+    username: ${DB_USER:ambulance_admin}
+    password: ${DB_PASSWORD:ambulance_secret_2026}
+    driverClassName: org.postgresql.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  mqtt:
+    broker-url: "tcp://${MQTT_HOST:mosquitto}:${MQTT_PORT:1883}"
