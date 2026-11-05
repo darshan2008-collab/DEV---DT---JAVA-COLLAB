@@ -34,7 +34,13 @@ def create_network_map(traffic_data=None, active_route="Route B", ambulance_pos=
     # Center around Karur
     center_lat = 10.9550
     center_lon = 78.0750
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=13, tiles="CartoDB positron")
+    # OpenStreetMap is public and does not require an API key.
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=13,
+        tiles="OpenStreetMap",
+        control_scale=True,
+    )
 
     # Map segment id to congestion level
     seg_congestion = {}
