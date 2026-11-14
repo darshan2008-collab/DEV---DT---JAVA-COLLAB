@@ -8,6 +8,7 @@ import streamlit as st
 import pandas as pd
 from streamlit_folium import st_folium
 from components.icons import (
+    render_sidebar_badge,
     GLOBAL_LIGHT_THEME_CSS, render_header, render_metric_card,
     SVG_ROUTE, SVG_AMBULANCE, SVG_PLAY, SVG_PAUSE, SVG_REFRESH, SVG_CHECK
 )
@@ -21,6 +22,7 @@ from components.map_utils import create_network_map
 
 st.set_page_config(page_title="Dispatcher Console", layout="wide")
 st.markdown(GLOBAL_LIGHT_THEME_CSS, unsafe_allow_html=True)
+
 
 # Executive Header
 header_html = render_header(
@@ -109,13 +111,19 @@ with col_form:
     hospitals = get_hospitals()
 
     available_ambs = [a for a in ambulances if a.get("status") == "AVAILABLE"]
-    amb_opts = {f"{a['id']} - {a['model']} ({a['plate_number']})": a['id'] for a in available_ambs}
-    hosp_opts = {f"{h['name']} ({h.get('available_beds', 0)} beds free)": h['id'] for h in hospitals}
+    amb_opts = {
+        f"{a.get('id', 'AMB-01')} - {a.get('model', 'ALS Ambulance')} ({a.get('plateNumber', a.get('plate_number', 'TN-47-AM-1001'))})": a.get('id', 'AMB-01')
+        for a in available_ambs
+    }
+    hosp_opts = {
+        f"{h.get('name', 'Hospital')} ({h.get('availableBeds', h.get('available_beds', 0))} beds free)": h.get('id', 'H-01')
+        for h in hospitals
+    }
 
     with st.form("dispatch_form"):
         st.markdown("**Origin Location:** Source S (Central Dispatch Station)")
         selected_amb = st.selectbox("Select Available Vehicle:", list(amb_opts.keys()) if amb_opts else ["No vehicles available"])
-        selected_hosp = st.selectbox("Select Receiving Hospital (Dispatcher Choice):", list(hosp_opts.keys()))
+        selected_hosp = st.selectbox("Select Receiving Hospital (Dispatcher Choice):", list(hosp_opts.keys()) if hosp_opts else ["Karur District GH (8 beds free)"])
 
         dispatch_btn = st.form_submit_button("Confirm Mission & Dispatch", type="primary", use_container_width=True)
         if dispatch_btn:
@@ -137,7 +145,7 @@ with col_map:
     trips = get_trips()
     active_trips = [t for t in trips if t.get("status") in ["ACTIVE", "CREATED", "PAUSED"]]
 
-    active_route = active_trips[0].get("selected_route") if active_trips else "Route B"
+    active_route = active_trips[0].get("selected_route", active_trips[0].get("selectedRoute", "Route B")) if active_trips else "Route B"
     net_map = create_network_map(traffic_data=traffic, active_route=active_route)
     st_folium(net_map, width=650, height=360)
 
@@ -149,23 +157,23 @@ st.subheader("Active Emergency Missions")
 if active_trips:
     trip_table = pd.DataFrame([
         {
-            "Mission ID": t["id"],
-            "Unit": t["ambulance_id"],
-            "Destination": t["destination"],
-            "Corridor": t["selected_route"],
-            "Status": t["status"],
-            "ETA (min)": f"{t.get('current_eta_minutes', 0.0):.1f}",
-            "Remaining (km)": f"{t.get('remaining_distance_km', 0.0):.1f}",
-            "Reroutes": t.get("route_change_count", 0),
-            "Start Time": t.get("start_time", "Pending")
+            "Mission ID": t.get("id", "M-01"),
+            "Unit": t.get("ambulance_id", t.get("ambulanceId", "AMB-01")),
+            "Destination": t.get("destination", "Karur GH"),
+            "Corridor": t.get("selected_route", t.get("selectedRoute", "Route B")),
+            "Status": t.get("status", "ACTIVE"),
+            "ETA (min)": f"{t.get('current_eta_minutes', t.get('currentEtaMinutes', 0.0)):.1f}",
+            "Remaining (km)": f"{t.get('remaining_distance_km', t.get('remainingDistanceKm', 0.0)):.1f}",
+            "Reroutes": t.get("route_change_count", t.get("routeChangeCount", 0)),
+            "Start Time": t.get("start_time", t.get("startTime", "Pending"))
         } for t in active_trips
     ])
     st.dataframe(trip_table, use_container_width=True)
 
     # Action controls for selected trip
     target_trip = active_trips[0]
-    t_id = target_trip["id"]
-    t_st = target_trip["status"]
+    t_id = target_trip.get("id", "TRIP-01")
+    t_st = target_trip.get("status", "ACTIVE")
 
     st.markdown(f"**Mission Operations Controls for <code>{t_id}</code>:**", unsafe_allow_html=True)
     b1, b2, b3, b4, b5 = st.columns(5)

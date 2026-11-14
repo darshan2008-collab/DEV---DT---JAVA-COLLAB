@@ -1,213 +1,217 @@
 /*
- * AI-Driven Smart Ambulance Navigation - ESP32 Miniature Junction Firmware
- * Hardware Signal Priority Controller
- * M. Kumarasamy College of Engineering, Karur - B.Tech AI & Data Science
- *
- * Safe Phase State Machine:
- * 1. Conflicting direction (EW) Yellow (3s)
- * 2. All-Red Clearance (2s) - CRITICAL: Never two greens simultaneously!
- * 3. Green Priority for Ambulance Direction (NS) (8s)
- * 4. Normal Fixed-Time Alternating Cycle
- *
- * Manual Override Button on GPIO 34 instantly cancels priority.
+ * =========================================================================
+ * Smart Ambulance Navigation System - ESP32 Signal & RGB LED Controller
+ * Dual Mode: Access Point (AP) + Station (Hotspot Client)
+ * =========================================================================
  */
 
 #include <WiFi.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
+#include <WebServer.h>
 
-// Wi-Fi and MQTT Configuration
-const char* WIFI_SSID = "SMART_AMBULANCE_WIFI";
-const char* WIFI_PASS = "emergency_priority_2026";
-const char* MQTT_SERVER = "192.168.1.100";
-const int   MQTT_PORT   = 1883;
-const char* JUNCTION_ID = "J2";
+// --- Wi-Fi Configuration ---
+// 1. Mobile Hotspot Details (Station Mode)
+const char* STA_SSID = "DARSHAN K";
+const char* STA_PASS = "12345678";
 
-// Pin Assignments
-// North-South (Ambulance Approach)
-#define NS_RED_PIN    18
-#define NS_YELLOW_PIN 19
-#define NS_GREEN_PIN  21
+// 2. ESP32's Own Wi-Fi Hotspot (SoftAP Mode - ALWAYS VISIBLE!)
+const char* AP_SSID  = "ESP32-AMBULANCE-SIGNAL";
+const char* AP_PASS  = "12345678";
 
-// East-West (Cross Traffic)
-#define EW_RED_PIN    22
-#define EW_YELLOW_PIN 23
-#define EW_GREEN_PIN  25
+// --- Hardware Pins ---
+#define PIN_RED    18
+#define PIN_GREEN  19
+#define PIN_BLUE   23
+#define PIN_ONBOARD_LED 2
 
-// Manual Override Button (Active LOW with internal pull-up)
-#define OVERRIDE_BTN_PIN 34
+WebServer server(80);
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+// State tracking
+String currentColor = "GREEN";
+bool sirenActive = false;
+unsigned long lastSirenToggle = 0;
+bool sirenFlip = false;
 
-enum SignalPhase {
-  NORMAL_CYCLE_EW_GREEN,
-  NORMAL_CYCLE_NS_GREEN,
-  PRIORITY_YELLOW_CLEARANCE,
-  PRIORITY_ALL_RED,
-  PRIORITY_GREEN,
-  MANUAL_OVERRIDE
-};
-
-SignalPhase currentPhase = NORMAL_CYCLE_EW_GREEN;
-unsigned long lastPhaseChange = 0;
-bool priorityRequested = false;
-String priorityAmbulanceId = "";
-
-void setLeds(bool nsR, bool nsY, bool nsG, bool ewR, bool ewY, bool ewG) {
-  digitalWrite(NS_RED_PIN,    nsR ? HIGH : LOW);
-  digitalWrite(NS_YELLOW_PIN, nsY ? HIGH : LOW);
-  digitalWrite(NS_GREEN_PIN,  nsG ? HIGH : LOW);
-  digitalWrite(EW_RED_PIN,    ewR ? HIGH : LOW);
-  digitalWrite(EW_YELLOW_PIN, ewY ? HIGH : LOW);
-  digitalWrite(EW_GREEN_PIN,  ewG ? HIGH : LOW);
+// Function to set RGB LED colors (Common Cathode: HIGH = ON, LOW = OFF)
+void setRGB(int r, int g, int b) {
+  analogWrite(PIN_RED,   r);
+  analogWrite(PIN_GREEN, g);
+  analogWrite(PIN_BLUE,  b);
 }
 
-void publishState(const char* stateName, const char* reason) {
-  StaticJsonDocument<200> doc;
-  doc["junction_id"] = JUNCTION_ID;
-  doc["state"] = stateName;
-  doc["reason"] = reason;
-  doc["timestamp"] = millis();
-
-  char buffer[256];
-  serializeJson(doc, buffer);
-  client.publish("junction/J2/state", buffer);
-}
-
-void onMqttMessage(char* topic, byte* message, unsigned int length) {
-  String msgStr;
-  for (unsigned int i = 0; i < length; i++) {
-    msgStr += (char)message[i];
-  }
-
-  if (String(topic).endsWith("/priority/request")) {
-    StaticJsonDocument<256> doc;
-    DeserializationError error = deserializeJson(doc, msgStr);
-    if (!error) {
-      priorityAmbulanceId = doc["ambulance_id"] | "AMB-01";
-      priorityRequested = true;
-
-      // Publish ACK
-      StaticJsonDocument<128> ack;
-      ack["junction_id"] = JUNCTION_ID;
-      ack["status"] = "ACCEPTED";
-      char ackBuf[128];
-      serializeJson(ack, ackBuf);
-      client.publish("junction/J2/ack", ackBuf);
-
-      // Transition to Yellow clearance phase
-      currentPhase = PRIORITY_YELLOW_CLEARANCE;
-      lastPhaseChange = millis();
-      setLeds(true, false, false, false, true, false); // NS Red, EW Yellow
-      publishState("YELLOW_CLEARANCE", "Cross-traffic yellow clearance for ambulance arrival");
-    }
-  } else if (String(topic).endsWith("/override")) {
-    currentPhase = MANUAL_OVERRIDE;
-    publishState("OVERRIDDEN", "Manual override activated from MQTT");
+void applyColor(String color) {
+  sirenActive = false;
+  currentColor = color;
+  
+  if (color == "RED") {
+    setRGB(255, 0, 0);
+  } else if (color == "YELLOW") {
+    setRGB(255, 120, 0); // Red + Green = Yellow
+  } else if (color == "GREEN") {
+    setRGB(0, 255, 0);
+  } else if (color == "BLUE") {
+    setRGB(0, 0, 255);
+  } else if (color == "SIREN") {
+    sirenActive = true;
+  } else { // OFF
+    setRGB(0, 0, 0);
+    currentColor = "OFF";
   }
 }
 
-void reconnectMqtt() {
-  while (!client.connected()) {
-    if (client.connect("ESP32_Junction_J2")) {
-      client.subscribe("junction/J2/priority/request");
-      client.subscribe("junction/J2/override");
-      publishState("NORMAL_CYCLE", "Junction online and operational");
-    } else {
-      delay(2000);
-    }
-  }
+// Web Server Handlers
+void handleRoot() {
+  String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  html += "<title>ESP32 Ambulance Signal Head</title>";
+  html += "<style>body{font-family:sans-serif; text-align:center; background:#0F172A; color:#F8FAFC; padding:20px;}";
+  html += "h1{color:#38BDF8; font-size:22px;}";
+  html += ".btn{display:block; width:85%; max-width:320px; margin:12px auto; padding:15px; font-size:18px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white;}";
+  html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-blue{background:#0284C7;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
+  html += ".status{margin:20px auto; padding:14px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
+  html += "</style></head><body>";
+  html += "<h1>ESP32 Signal Head Controller</h1>";
+  html += "<div class='status'>Active Status: <strong style='color:#38BDF8;'>" + currentColor + "</strong></div>";
+  html += "<a class='btn btn-red' href='/red'>RED LIGHT (STOP)</a>";
+  html += "<a class='btn btn-yellow' href='/yellow'>YELLOW LIGHT (PREEMPT)</a>";
+  html += "<a class='btn btn-green' href='/green'>GREEN LIGHT (CLEAR)</a>";
+  html += "<a class='btn btn-blue' href='/blue'>BLUE LIGHT</a>";
+  html += "<a class='btn btn-siren' href='/siren'>AMBULANCE SIREN FLASH</a>";
+  html += "<a class='btn btn-off' href='/off'>TURN OFF ALL LIGHTS</a>";
+  html += "<p style='font-size:12px; color:#94A3B8; margin-top:25px;'>Smart Ambulance Corridor Priority System</p>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleRed() {
+  applyColor("RED");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleYellow() {
+  applyColor("YELLOW");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleGreen() {
+  applyColor("GREEN");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleBlue() {
+  applyColor("BLUE");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleSiren() {
+  applyColor("SIREN");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleOff() {
+  applyColor("OFF");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleStatus() {
+  String json = "{\"status\":\"online\",\"color\":\"" + currentColor + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\"}";
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", json);
 }
 
 void setup() {
   Serial.begin(115200);
-
-  pinMode(NS_RED_PIN, OUTPUT);
-  pinMode(NS_YELLOW_PIN, OUTPUT);
-  pinMode(NS_GREEN_PIN, OUTPUT);
-  pinMode(EW_RED_PIN, OUTPUT);
-  pinMode(EW_YELLOW_PIN, OUTPUT);
-  pinMode(EW_GREEN_PIN, OUTPUT);
-  pinMode(OVERRIDE_BTN_PIN, INPUT_PULLUP);
-
-  // Initial State: Safe All-Red for 1s
-  setLeds(true, false, false, true, false, false);
   delay(1000);
+  Serial.println("\n\n========================================");
+  Serial.println("  ESP32 SMART AMBULANCE SIGNAL HEAD");
+  Serial.println("========================================");
 
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  client.setServer(MQTT_SERVER, MQTT_PORT);
-  client.setCallback(onMqttMessage);
+  // Configure Pins
+  pinMode(PIN_RED, OUTPUT);
+  pinMode(PIN_GREEN, OUTPUT);
+  pinMode(PIN_BLUE, OUTPUT);
+  pinMode(PIN_ONBOARD_LED, OUTPUT);
+  
+  // Test sequence: Blink onboard LED and cycle RGB colors
+  digitalWrite(PIN_ONBOARD_LED, HIGH);
+  setRGB(255, 0, 0); delay(400);
+  setRGB(0, 255, 0); delay(400);
+  setRGB(0, 0, 255); delay(400);
+  setRGB(0, 0, 0);   delay(200);
 
-  lastPhaseChange = millis();
+  // Set Wi-Fi Mode to DUAL (AP + STA)
+  WiFi.mode(WIFI_AP_STA);
+
+  // 1. Start ESP32's OWN Wi-Fi Hotspot (Visible to all phones & laptops!)
+  Serial.println("[Wi-Fi] Starting ESP32 Hotspot (AP)...");
+  WiFi.softAP(AP_SSID, AP_PASS);
+  Serial.print("[Wi-Fi] Broadcast SSID: ");
+  Serial.println(AP_SSID);
+  Serial.print("[Wi-Fi] AP IP Address:  http://");
+  Serial.println(WiFi.softAPIP());
+
+  // 2. Connect to Mobile Hotspot 'DARSHAN K'
+  Serial.print("[Wi-Fi] Connecting to Mobile Hotspot '");
+  Serial.print(STA_SSID);
+  Serial.println("' (Must be 2.4 GHz)...");
+  
+  WiFi.begin(STA_SSID, STA_PASS);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 15) {
+    delay(500);
+    Serial.print(".");
+    digitalWrite(PIN_ONBOARD_LED, !digitalRead(PIN_ONBOARD_LED));
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[Wi-Fi] Connected to Mobile Hotspot successfully!");
+    Serial.print("[Wi-Fi] Mobile Hotspot IP: http://");
+    Serial.println(WiFi.localIP());
+    digitalWrite(PIN_ONBOARD_LED, HIGH);
+  } else {
+    Serial.println("\n[Wi-Fi] Mobile Hotspot not reached. Continuing in Standalone AP Mode.");
+    Serial.println("[Wi-Fi] Tip: Ensure Mobile Hotspot 'AP Band' is set to 2.4 GHz!");
+    digitalWrite(PIN_ONBOARD_LED, LOW);
+  }
+
+  // Set default initial light: GREEN
+  applyColor("GREEN");
+
+  // Web Server Endpoints
+  server.on("/", handleRoot);
+  server.on("/red", handleRed);
+  server.on("/yellow", handleYellow);
+  server.on("/green", handleGreen);
+  server.on("/blue", handleBlue);
+  server.on("/siren", handleSiren);
+  server.on("/off", handleOff);
+  server.on("/status", handleStatus);
+
+  server.begin();
+  Serial.println("[HTTP] Web Server Started!");
+  Serial.println("========================================\n");
 }
 
 void loop() {
-  if (WiFi.status() == WL_CONNECTED && !client.connected()) {
-    reconnectMqtt();
-  }
-  client.loop();
+  server.handleClient();
 
-  // Check physical manual override button
-  if (digitalRead(OVERRIDE_BTN_PIN) == LOW) {
-    currentPhase = MANUAL_OVERRIDE;
-  }
-
-  unsigned long now = millis();
-
-  switch (currentPhase) {
-    case PRIORITY_YELLOW_CLEARANCE:
-      if (now - lastPhaseChange >= 3000) { // 3s yellow clearance
-        currentPhase = PRIORITY_ALL_RED;
-        lastPhaseChange = now;
-        setLeds(true, false, false, true, false, false); // ALL RED
-        publishState("ALL_RED", "All-red safe intersection clearance");
+  // Emergency Siren Animation (Red & Blue Alternate Flashing)
+  if (sirenActive) {
+    unsigned long currentMillis = millis();
+    if (currentMillis - lastSirenToggle >= 120) {
+      lastSirenToggle = currentMillis;
+      sirenFlip = !sirenFlip;
+      if (sirenFlip) {
+        setRGB(255, 0, 0); // RED
+      } else {
+        setRGB(0, 0, 255); // BLUE
       }
-      break;
-
-    case PRIORITY_ALL_RED:
-      if (now - lastPhaseChange >= 2000) { // 2s all-red clearance
-        currentPhase = PRIORITY_GREEN;
-        lastPhaseChange = now;
-        setLeds(false, false, true, true, false, false); // NS Green, EW Red
-        publishState("GREEN_PRIORITY", "Green priority granted to ambulance direction");
-      }
-      break;
-
-    case PRIORITY_GREEN:
-      if (now - lastPhaseChange >= 8000) { // 8s priority green hold
-        priorityRequested = false;
-        currentPhase = NORMAL_CYCLE_EW_GREEN;
-        lastPhaseChange = now;
-        setLeds(true, false, false, false, false, true); // EW Green, NS Red
-        publishState("NORMAL_CYCLE", "Priority complete. Resuming normal cycling.");
-      }
-      break;
-
-    case MANUAL_OVERRIDE:
-      // Return to normal fixed cycle immediately
-      priorityRequested = false;
-      currentPhase = NORMAL_CYCLE_EW_GREEN;
-      lastPhaseChange = now;
-      setLeds(true, false, false, false, false, true);
-      publishState("NORMAL_CYCLE", "Manual override reset junction to normal cycle");
-      delay(500); // debounce
-      break;
-
-    case NORMAL_CYCLE_EW_GREEN:
-      if (!priorityRequested && now - lastPhaseChange >= 10000) { // 10s EW green
-        currentPhase = NORMAL_CYCLE_NS_GREEN;
-        lastPhaseChange = now;
-        setLeds(false, false, true, true, false, false); // NS Green, EW Red
-      }
-      break;
-
-    case NORMAL_CYCLE_NS_GREEN:
-      if (!priorityRequested && now - lastPhaseChange >= 10000) { // 10s NS green
-        currentPhase = NORMAL_CYCLE_EW_GREEN;
-        lastPhaseChange = now;
-        setLeds(true, false, false, false, false, true); // EW Green, NS Red
-      }
-      break;
+    }
   }
 }
