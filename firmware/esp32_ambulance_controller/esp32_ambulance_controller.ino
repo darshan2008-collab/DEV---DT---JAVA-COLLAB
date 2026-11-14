@@ -1,208 +1,272 @@
 /*
  * =========================================================================
- * Smart Ambulance Navigation System - ESP32 Signal & RGB LED Controller
- * Dual Mode: Access Point (AP) + Station (Hotspot Client)
+ * Smart Ambulance Navigation System - ESP32 Miniature Traffic Controller
+ * Hardware:
+ *   1. 3-LED Traffic Light Module (R, Y, G, GND)
+ *   2. I2C 0.96" OLED Display (SSD1306) via U8G2 Library
+ *   3. JLG1295-5 Electromagnetic Buzzer (Audio Feedback & Ambulance Siren)
  * =========================================================================
  * 
- * 1. Broadcasts its OWN Wi-Fi Hotspot:
- *    SSID:     ESP32-AMBULANCE-SIGNAL
- *    Password: 12345678
- *    Static IP: 192.168.4.1
- *    (Shows up directly in your Mobile Phone / Laptop Wi-Fi list!)
+ * HARDWARE CONNECTIONS:
  * 
- * 2. Connects simultaneously to Mobile Hotspot:
- *    SSID:     DARSHAN K
- *    Password: 12345678
+ * 1. 3-LED TRAFFIC LIGHT MODULE (Printed: G, Y, R, GND):
+ *    [GND] Pin -> ESP32 GND
+ *    [ R ] Pin -> ESP32 GPIO 18 (Red LED)
+ *    [ Y ] Pin -> ESP32 GPIO 19 (Yellow LED)
+ *    [ G ] Pin -> ESP32 GPIO 23 (Green LED)
  * 
- * 3. Controls 4-Pin Common Cathode RGB LED:
- *    Pin 1 (Red)   -> ESP32 GPIO 18 (via 220 Ohm resistor)
- *    Pin 2 (GND)   -> ESP32 GND (Longest lead)
- *    Pin 3 (Green) -> ESP32 GPIO 19 (via 220 Ohm resistor)
- *    Pin 4 (Blue)  -> ESP32 GPIO 23 (via 220 Ohm resistor)
- *    (GPIO 21 SDA and GPIO 22 SCL kept free for I2C 16x2 LCD)
+ * 2. JLG1295-5 BUZZER (Passive Electromagnetic Buzzer):
+ *    [(+)] Pin (Long lead / near '+' mark) -> ESP32 GPIO 25
+ *    [(-)] Pin (Short lead)               -> ESP32 GND
+ * 
+ * 3. 0.96" I2C OLED DISPLAY (SSD1306):
+ *    [VCC] Pin -> ESP32 3.3V
+ *    [GND] Pin -> ESP32 GND
+ *    [SCL] Pin -> ESP32 GPIO 22
+ *    [SDA] Pin -> ESP32 GPIO 21
  * =========================================================================
  */
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include <Wire.h>
+#include <U8g2lib.h>
+
+// U8G2 Constructor for 0.96" I2C SSD1306 128x64 OLED (Full Buffer, Fast & Crisp)
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 22, /* data=*/ 21);
 
 // --- Wi-Fi Configuration ---
-// 1. Mobile Hotspot Details (Station Mode)
 const char* STA_SSID = "DARSHAN K";
 const char* STA_PASS = "12345678";
 
-// 2. ESP32's Own Wi-Fi Hotspot (SoftAP Mode - ALWAYS VISIBLE!)
 const char* AP_SSID  = "ESP32-AMBULANCE-SIGNAL";
 const char* AP_PASS  = "12345678";
 
-// --- Hardware Pins ---
-#define PIN_RED    18
-#define PIN_GREEN  19
-#define PIN_BLUE   23
+// --- Hardware Pin Definitions ---
+#define PIN_RED        18
+#define PIN_YELLOW     19
+#define PIN_GREEN      23
+#define PIN_BUZZER     25
 #define PIN_ONBOARD_LED 2
 
 WebServer server(80);
 
 // State tracking
-String currentColor = "GREEN";
+String currentSignal = "GREEN";
 bool sirenActive = false;
 unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
+String staIpStr = "Connecting...";
 
-// Function to set RGB LED colors (Common Cathode: HIGH = ON, LOW = OFF)
-void setRGB(int r, int g, int b) {
-  analogWrite(PIN_RED,   r);
-  analogWrite(PIN_GREEN, g);
-  analogWrite(PIN_BLUE,  b);
+// Audible Frequency Tone Beep for Passive JLG1295 Buzzer
+void beepFeedback(int frequencyHz, int durationMs) {
+  tone(PIN_BUZZER, frequencyHz);
+  delay(durationMs);
+  noTone(PIN_BUZZER);
+  digitalWrite(PIN_BUZZER, LOW);
 }
 
-void applyColor(String color) {
-  sirenActive = false;
-  currentColor = color;
+void beepFeedback() {
+  beepFeedback(2400, 80);
+}
+
+// Update OLED Screen using U8G2
+void updateOled(String signalName) {
+  u8g2.clearBuffer();
+
+  // Top Banner / Header (Inverted background box)
+  u8g2.setDrawColor(1);
+  u8g2.drawRBox(0, 0, 128, 14, 2);
+  u8g2.setDrawColor(0); // White text on dark box
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(10, 10, "SMART AMBULANCE J2");
+
+  // Restore normal drawing color
+  u8g2.setDrawColor(1);
+
+  // Line 2: Signal State
+  u8g2.setFont(u8g2_font_7x14B_tf);
+  if (signalName == "RED") {
+    u8g2.drawStr(0, 29, "TRAFFIC: [RED] STOP");
+  } else if (signalName == "YELLOW") {
+    u8g2.drawStr(0, 29, "TRAFFIC: [YEL] CLEAR");
+  } else if (signalName == "GREEN") {
+    u8g2.drawStr(0, 29, "TRAFFIC: [GRN] GO-AMB");
+  } else if (signalName == "SIREN") {
+    u8g2.drawStr(0, 29, "SIREN: [WEE-WOO !]");
+  } else {
+    u8g2.drawStr(0, 29, "TRAFFIC: [ALL OFF]");
+  }
+
+  // Divider line
+  u8g2.drawHLine(0, 33, 128);
+
+  // Line 3 & 4: Network IP Info
+  u8g2.setFont(u8g2_font_5x8_tf);
+  u8g2.drawStr(0, 44, "AP IP : 192.168.4.1");
   
-  if (color == "RED") {
-    setRGB(255, 0, 0);
-  } else if (color == "YELLOW") {
-    setRGB(255, 120, 0); // Red + Green = Yellow
-  } else if (color == "GREEN") {
-    setRGB(0, 255, 0);
-  } else if (color == "BLUE") {
-    setRGB(0, 0, 255);
-  } else if (color == "SIREN") {
+  String staLine = "STA IP: " + staIpStr;
+  u8g2.drawStr(0, 53, staLine.c_str());
+
+  // Line 5: District
+  u8g2.setFont(u8g2_font_4x6_tf);
+  u8g2.drawStr(0, 62, "KARUR MEDICAL CORRIDOR | BUZZER ON");
+
+  u8g2.sendBuffer();
+}
+
+// Control the 3 Traffic Light LEDs directly (HIGH = ON, LOW = OFF)
+void setTrafficLights(bool red, bool yellow, bool green) {
+  digitalWrite(PIN_RED,    red    ? HIGH : LOW);
+  digitalWrite(PIN_YELLOW, yellow ? HIGH : LOW);
+  digitalWrite(PIN_GREEN,  green  ? HIGH : LOW);
+}
+
+void applySignal(String signal) {
+  signal.toUpperCase();
+  sirenActive = false;
+  currentSignal = signal;
+
+  // Immediately silence ongoing tones
+  noTone(PIN_BUZZER);
+  digitalWrite(PIN_BUZZER, LOW);
+
+  if (signal == "RED") {
+    setTrafficLights(true, false, false);
+    beepFeedback(1800, 100); // 1.8 kHz clear tone for RED
+  } else if (signal == "YELLOW") {
+    setTrafficLights(false, true, false);
+    beepFeedback(2200, 80);  // 2.2 kHz caution tone for YELLOW
+  } else if (signal == "GREEN") {
+    setTrafficLights(false, false, true);
+    // Double Pip-Pip Beep for Ambulance Priority GREEN!
+    beepFeedback(2600, 60);
+    delay(40);
+    beepFeedback(2600, 60);
+  } else if (signal == "SIREN") {
     sirenActive = true;
   } else { // OFF
-    setRGB(0, 0, 0);
-    currentColor = "OFF";
+    setTrafficLights(false, false, false);
+    currentSignal = "OFF";
+    beepFeedback(1200, 120); // 1.2 kHz tone for OFF
   }
+
+  updateOled(currentSignal);
 }
 
-// Web Server Handlers
+// Web Server Handlers (Instant HTTP 200, Zero-Lag Execution)
 void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-  html += "<title>ESP32 Ambulance Signal Head</title>";
+  html += "<title>Traffic Signal & Siren Controller</title>";
   html += "<style>body{font-family:sans-serif; text-align:center; background:#0F172A; color:#F8FAFC; padding:20px;}";
-  html += "h1{color:#38BDF8; font-size:22px;}";
-  html += ".btn{display:block; width:85%; max-width:320px; margin:12px auto; padding:15px; font-size:18px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white;}";
-  html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-blue{background:#0284C7;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
-  html += ".status{margin:20px auto; padding:14px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
-  html += "</style></head><body>";
-  html += "<h1>ESP32 Signal Head Controller</h1>";
-  html += "<div class='status'>Active Status: <strong style='color:#38BDF8;'>" + currentColor + "</strong></div>";
-  html += "<a class='btn btn-red' href='/red'>RED LIGHT (STOP)</a>";
-  html += "<a class='btn btn-yellow' href='/yellow'>YELLOW LIGHT (PREEMPT)</a>";
-  html += "<a class='btn btn-green' href='/green'>GREEN LIGHT (CLEAR)</a>";
-  html += "<a class='btn btn-blue' href='/blue'>BLUE LIGHT</a>";
-  html += "<a class='btn btn-siren' href='/siren'>AMBULANCE SIREN FLASH</a>";
-  html += "<a class='btn btn-off' href='/off'>TURN OFF ALL LIGHTS</a>";
-  html += "<p style='font-size:12px; color:#94A3B8; margin-top:25px;'>Smart Ambulance Corridor Priority System</p>";
+  html += "h1{color:#38BDF8; font-size:20px;}";
+  html += ".btn{display:block; width:85%; max-width:320px; margin:10px auto; padding:14px; font-size:16px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white; cursor:pointer;}";
+  html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
+  html += ".status{margin:16px auto; padding:12px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
+  html += "</style><script>";
+  html += "function sendCmd(cmd){fetch('/' + cmd).then(r=>location.reload());}";
+  html += "</script></head><body>";
+  html += "<h1>ESP32 Signal &amp; Siren Controller</h1>";
+  html += "<div class='status'>Active Signal: <strong style='color:#38BDF8;'>" + currentSignal + "</strong><br>";
+  html += "<small style='color:#94A3B8;'>Hardware: 3-LED Module + JLG1295 Buzzer + OLED</small></div>";
+  html += "<button class='btn btn-red' onclick=\"sendCmd('red')\">RED LIGHT (STOP TRAFFIC)</button>";
+  html += "<button class='btn btn-yellow' onclick=\"sendCmd('yellow')\">YELLOW LIGHT (CLEARANCE)</button>";
+  html += "<button class='btn btn-green' onclick=\"sendCmd('green')\">GREEN LIGHT (AMBULANCE GO)</button>";
+  html += "<button class='btn btn-siren' onclick=\"sendCmd('siren')\">AMBULANCE SIREN (WEE-WOO AUDIO)</button>";
+  html += "<button class='btn btn-off' onclick=\"sendCmd('off')\">TURN OFF ALL LIGHTS</button>";
+  html += "<p style='font-size:12px; color:#94A3B8; margin-top:20px;'>Karur Medical District | Corridor Node J2</p>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
 
-void handleRed() {
-  applyColor("RED");
-  server.sendHeader("Location", "/");
-  server.send(303);
+// Unified /set handler (supports /set?color=RED, /set?color=GREEN, etc.)
+void handleSet() {
+  if (server.hasArg("color")) {
+    String c = server.arg("color");
+    applySignal(c);
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.send(200, "text/plain", "OK: " + currentSignal);
+  } else {
+    server.send(400, "text/plain", "Missing color parameter");
+  }
 }
 
-void handleYellow() {
-  applyColor("YELLOW");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-
-void handleGreen() {
-  applyColor("GREEN");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-
-void handleBlue() {
-  applyColor("BLUE");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-
-void handleSiren() {
-  applyColor("SIREN");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-
-void handleOff() {
-  applyColor("OFF");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
+// Direct Instant 200 Handlers (Fast Sub-millisecond Execution)
+void handleRed()    { applySignal("RED");    server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: RED"); }
+void handleYellow() { applySignal("YELLOW"); server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: YELLOW"); }
+void handleGreen()  { applySignal("GREEN");  server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: GREEN"); }
+void handleBlue()   { applySignal("GREEN");  server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: GREEN"); }
+void handleSiren()  { applySignal("SIREN");  server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: SIREN"); }
+void handleOff()    { applySignal("OFF");    server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: OFF"); }
 
 void handleStatus() {
-  String json = "{\"status\":\"online\",\"color\":\"" + currentColor + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\"}";
+  String json = "{\"status\":\"online\",\"signal\":\"" + currentSignal + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"module\":\"3LED_BUZZER_OLED\"}";
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", json);
 }
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
-  Serial.println("\n\n========================================");
-  Serial.println("  ESP32 SMART AMBULANCE SIGNAL HEAD");
-  Serial.println("========================================");
+  delay(300);
 
-  // Configure Pins
+  // 1. Initialize U8G2 OLED Display
+  u8g2.begin();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_7x14B_tf);
+  u8g2.drawStr(6, 24, "TRAFFIC & SIREN J2");
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(14, 44, "Booting ESP32...");
+  u8g2.drawStr(8, 58, "R-Y-G + Buzzer Active");
+  u8g2.sendBuffer();
+
+  // 2. Configure Hardware Pins as OUTPUT
   pinMode(PIN_RED, OUTPUT);
+  pinMode(PIN_YELLOW, OUTPUT);
   pinMode(PIN_GREEN, OUTPUT);
-  pinMode(PIN_BLUE, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_ONBOARD_LED, OUTPUT);
-  
-  // Test sequence: Blink onboard LED and cycle RGB colors
+
+  // Ensure buzzer starts silent
+  noTone(PIN_BUZZER);
+  digitalWrite(PIN_BUZZER, LOW);
+
+  // 3. Hardware Self-Test: Cycle Red -> Yellow -> Green with loud tone beeps!
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setRGB(255, 0, 0); delay(400);
-  setRGB(0, 255, 0); delay(400);
-  setRGB(0, 0, 255); delay(400);
-  setRGB(0, 0, 0);   delay(200);
+  setTrafficLights(true, false, false);  beepFeedback(1800, 60); delay(250); // Red (1.8kHz)
+  setTrafficLights(false, true, false);  beepFeedback(2200, 60); delay(250); // Yellow (2.2kHz)
+  setTrafficLights(false, false, true);  beepFeedback(2600, 80); delay(250); // Green (2.6kHz)
+  setTrafficLights(false, false, false); delay(150); // Off
 
-  // Set Wi-Fi Mode to DUAL (AP + STA)
+  // 4. Wi-Fi Dual Mode: AP + STA
   WiFi.mode(WIFI_AP_STA);
-
-  // 1. Start ESP32's OWN Wi-Fi Hotspot (Visible to all phones & laptops!)
-  Serial.println("[Wi-Fi] Starting ESP32 Hotspot (AP)...");
   WiFi.softAP(AP_SSID, AP_PASS);
-  Serial.print("[Wi-Fi] Broadcast SSID: ");
-  Serial.println(AP_SSID);
-  Serial.print("[Wi-Fi] AP IP Address:  http://");
-  Serial.println(WiFi.softAPIP());
+  Serial.println("[Wi-Fi] SoftAP Started: " + String(AP_SSID));
 
-  // 2. Connect to Mobile Hotspot 'DARSHAN K'
-  Serial.print("[Wi-Fi] Connecting to Mobile Hotspot '");
-  Serial.print(STA_SSID);
-  Serial.println("' (Must be 2.4 GHz)...");
-  
   WiFi.begin(STA_SSID, STA_PASS);
-
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 15) {
-    delay(500);
-    Serial.print(".");
+  while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+    delay(300);
     digitalWrite(PIN_ONBOARD_LED, !digitalRead(PIN_ONBOARD_LED));
     attempts++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[Wi-Fi] Connected to Mobile Hotspot successfully!");
-    Serial.print("[Wi-Fi] Mobile Hotspot IP: http://");
-    Serial.println(WiFi.localIP());
+    staIpStr = WiFi.localIP().toString();
+    Serial.println("[Wi-Fi] Connected! STA IP: " + staIpStr);
     digitalWrite(PIN_ONBOARD_LED, HIGH);
   } else {
-    Serial.println("\n[Wi-Fi] Mobile Hotspot not reached. Continuing in Standalone AP Mode.");
-    Serial.println("[Wi-Fi] Tip: Ensure Mobile Hotspot 'AP Band' is set to 2.4 GHz!");
+    staIpStr = "Offline (AP only)";
+    Serial.println("[Wi-Fi] Hotspot not found. Running in standalone AP mode.");
     digitalWrite(PIN_ONBOARD_LED, LOW);
   }
 
-  // Set default initial light: GREEN
-  applyColor("GREEN");
+  // 5. Initial State: GREEN (Ambulance Wave)
+  applySignal("GREEN");
 
-  // Web Server Endpoints
+  // 6. Register Web Server Endpoints
+  server.enableCORS(true);
   server.on("/", handleRoot);
+  server.on("/set", handleSet);
   server.on("/red", handleRed);
   server.on("/yellow", handleYellow);
   server.on("/green", handleGreen);
@@ -212,23 +276,24 @@ void setup() {
   server.on("/status", handleStatus);
 
   server.begin();
-  Serial.println("[HTTP] Web Server Started!");
-  Serial.println("========================================\n");
+  Serial.println("[HTTP] Server ready on http://192.168.4.1");
 }
 
 void loop() {
   server.handleClient();
 
-  // Emergency Siren Animation (Red & Blue Alternate Flashing)
+  // Emergency Siren Mode: Authentic Two-Tone "Wee-Woo" (ட்வைன் ட்வைன்) Sound + Alternate Flashing
   if (sirenActive) {
     unsigned long currentMillis = millis();
-    if (currentMillis - lastSirenToggle >= 120) {
+    if (currentMillis - lastSirenToggle >= 260) {
       lastSirenToggle = currentMillis;
       sirenFlip = !sirenFlip;
       if (sirenFlip) {
-        setRGB(255, 0, 0); // RED
+        setTrafficLights(true, false, false); // RED LED ON
+        tone(PIN_BUZZER, 960);                // High Tone (~960 Hz) "WEE"
       } else {
-        setRGB(0, 0, 255); // BLUE
+        setTrafficLights(false, false, true); // GREEN LED ON
+        tone(PIN_BUZZER, 680);                // Low Tone (~680 Hz) "WOO"
       }
     }
   }

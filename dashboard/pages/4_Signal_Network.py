@@ -42,14 +42,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Top Status Metrics Bar
+# Top Status Metrics Bar & ESP32 Live Auto-Probe
+esp32_ip = st.session_state.get("esp_ip_addr", "192.168.4.1")
+
+# Ultra-fast non-blocking connection probe (300ms max)
+esp_connected = False
+try:
+    import requests
+    _r = requests.get(f"http://{esp32_ip}/status", timeout=0.35)
+    if _r.status_code == 200:
+        esp_connected = True
+        st.session_state["esp_connected"] = True
+except Exception:
+    esp_connected = st.session_state.get("esp_connected", False)
+
 s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
     st.markdown(render_metric_card("Corridor Node", "Junction J2", "Central Boulevard Monitored", "primary"), unsafe_allow_html=True)
 with s2:
     st.markdown(render_metric_card("Active Priority", "North-South", "Ambulance Wave Active", "danger"), unsafe_allow_html=True)
 with s3:
-    st.markdown(render_metric_card("ESP32 Controller", "Online (Node J2)", "MQTT 1883 | Ping: 11.4ms", "success"), unsafe_allow_html=True)
+    if esp_connected:
+        st.markdown(render_metric_card("ESP32 Controller", "CONNECTED", f"IP: {esp32_ip} | Online", "success"), unsafe_allow_html=True)
+    else:
+        st.markdown(render_metric_card("ESP32 Controller", "DISCONNECTED", "Awaiting Hardware Ping", "warning"), unsafe_allow_html=True)
 with s4:
     st.markdown(render_metric_card("Safety Invariant", "100% Enforced", "Yellow 3s + All-Red 2s Hold", "success"), unsafe_allow_html=True)
 with s5:
@@ -58,21 +74,22 @@ with s5:
 st.write("")
 
 # REAL-TIME SIGNAL HEAD & PHASE SIMULATOR
-st.subheader("Physical ESP32 Edge Signal Head & Live RGB Hardware Controller")
+st.subheader("Physical ESP32 Edge Signal Head & Live Traffic Light Controller")
 
-# Prominent Hardware Connection & RGB Color Switcher
+# Prominent Hardware Connection & Traffic Light Switcher
 with st.container(border=True):
     col_conn1, col_conn2 = st.columns([7, 5])
     
     with col_conn1:
         st.markdown("#### Hardware Integration: Connect ESP32 via IP")
-        esp32_ip = st.text_input(
+        esp32_ip_input = st.text_input(
             "Enter your ESP32 Wi-Fi IP Address:",
-            value=st.session_state.get("esp_ip_addr", "192.168.1.15"),
+            value=esp32_ip,
             key="input_esp_ip_addr",
-            help="Check the IP address shown on your 16x2 LCD or Arduino Serial Monitor"
+            help="SoftAP default: 192.168.4.1 | Or enter STA IP shown on your OLED Display"
         )
-        st.session_state["esp_ip_addr"] = esp32_ip
+        st.session_state["esp_ip_addr"] = esp32_ip_input
+        esp32_ip = esp32_ip_input
         
     with col_conn2:
         st.write("")
@@ -81,60 +98,79 @@ with st.container(border=True):
         if ping_btn:
             import requests
             try:
-                r = requests.get(f"http://{esp32_ip}/", timeout=1.5)
-                st.success(f"Connected to ESP32 at {esp32_ip} (HTTP 200 OK)")
+                r = requests.get(f"http://{esp32_ip}/status", timeout=0.6)
+                if r.status_code == 200:
+                    st.session_state["esp_connected"] = True
+                    esp_connected = True
+                    st.success(f"Connected to ESP32 at {esp32_ip} (HTTP 200 OK)")
+                else:
+                    st.session_state["esp_connected"] = False
+                    st.warning(f"ESP32 returned HTTP {r.status_code}")
             except Exception as e:
-                st.warning(f"Awaiting connection at http://{esp32_ip} (Ensure ESP32 is powered ON)")
+                st.session_state["esp_connected"] = False
+                st.warning(f"Could not connect to http://{esp32_ip} (Check Wi-Fi network)")
+
+    # Dynamic Connection Status Banner & Network Helper
+    if st.session_state.get("esp_connected", False):
+        st.success(f"**ESP32 HARDWARE CONNECTED** — Node J2 Online at `http://{esp32_ip}` (OLED & Traffic Light Active)")
+    else:
+        st.info(f"**Wi-Fi Connection Guide:**\n- **Option 1 (Direct Hotspot):** Connect laptop Wi-Fi to **`ESP32-AMBULANCE-SIGNAL`** -> IP is **`192.168.4.1`**.\n- **Option 2 (Mobile Hotspot):** If ESP32 is on mobile hotspot **`DARSHAN K`**, check the **STA IP** shown on your OLED display (e.g. `192.168.43.xxx`) and enter it above.")
 
     st.markdown("---")
-    st.markdown("#### Direct Physical RGB Light Switcher")
-    st.caption("Click any button below to instantly change the physical 4-Pin RGB LED light color on your breadboard:")
+    st.markdown("#### Direct Physical Traffic Light Switcher (Zero-Lag)")
+    st.caption("Click any button below to instantly trigger the physical 3-LED Traffic Light module (Red, Yellow, Green):")
     
-    col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(6)
+    col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
     
     import requests
-    def trigger_esp(target_ip, color_code):
+    def trigger_esp_fast(target_ip, color_code):
+        color_code_up = color_code.upper()
+        # Fast direct non-blocking call (300ms timeout)
         try:
-            url = f"http://{target_ip}/set?color={color_code}"
-            requests.get(url, timeout=1.5)
-            return True, f"Hardware {color_code} Active"
-        except Exception as e:
-            return False, f"Could not reach {target_ip}"
+            url = f"http://{target_ip}/set?color={color_code_up}"
+            r = requests.get(url, timeout=0.35)
+            if r.status_code == 200:
+                return True, f"Hardware {color_code_up} Active"
+        except Exception:
+            pass
+        # Fallback to direct path
+        try:
+            url = f"http://{target_ip}/{color_code.lower()}"
+            r = requests.get(url, timeout=0.35)
+            if r.status_code in [200, 303]:
+                return True, f"Hardware {color_code_up} Active"
+        except Exception:
+            return False, f"Could not reach http://{target_ip}"
+        return False, f"Could not reach http://{target_ip}"
 
     with col_b1:
         if st.button("RED Signal (Stop)", use_container_width=True, type="secondary"):
-            ok, m = trigger_esp(esp32_ip, "RED")
+            ok, m = trigger_esp_fast(esp32_ip, "RED")
             if ok: st.success("RED ON")
             else: st.warning(m)
             
     with col_b2:
-        if st.button("YELLOW Signal", use_container_width=True, type="secondary"):
-            ok, m = trigger_esp(esp32_ip, "YELLOW")
+        if st.button("YELLOW (Clear)", use_container_width=True, type="secondary"):
+            ok, m = trigger_esp_fast(esp32_ip, "YELLOW")
             if ok: st.success("YELLOW ON")
             else: st.warning(m)
 
     with col_b3:
         if st.button("GREEN Priority", use_container_width=True, type="primary"):
-            ok, m = trigger_esp(esp32_ip, "GREEN")
+            ok, m = trigger_esp_fast(esp32_ip, "GREEN")
             if ok: st.success("GREEN ON")
             else: st.warning(m)
 
     with col_b4:
-        if st.button("BLUE Light", use_container_width=True):
-            ok, m = trigger_esp(esp32_ip, "SIREN")
-            if ok: st.info("BLUE ON")
-            else: st.warning(m)
-
-    with col_b5:
         if st.button("Siren Flasher", use_container_width=True):
-            ok, m = trigger_esp(esp32_ip, "SIREN")
+            ok, m = trigger_esp_fast(esp32_ip, "SIREN")
             if ok: st.info("Siren Active")
             else: st.warning(m)
 
-    with col_b6:
-        if st.button("Turn OFF Light", use_container_width=True):
-            ok, m = trigger_esp(esp32_ip, "OFF")
-            if ok: st.info("LED OFF")
+    with col_b5:
+        if st.button("Turn OFF All", use_container_width=True):
+            ok, m = trigger_esp_fast(esp32_ip, "OFF")
+            if ok: st.info("Signals OFF")
             else: st.warning(m)
 
 st.write("")

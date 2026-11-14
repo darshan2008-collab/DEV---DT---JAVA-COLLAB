@@ -176,11 +176,29 @@ with tab_demo:
         """, unsafe_allow_html=True)
 
     st.write("")
-    st.subheader("Interactive Corridor Map & Active Vehicles")
+    st.subheader("Karur District Corridor & Healthcare Map (கரூர் மாவட்ட மருத்துவ வரைபடம்)")
+    
+    col_map_filter, col_map_info = st.columns([3, 4])
+    with col_map_filter:
+        hosp_cat = st.selectbox(
+            "Filter Karur Healthcare Facilities (மருத்துவமனைகள்):",
+            ["All", "Govt Medical College", "Govt Hospital", "Private Multispeciality", "Clinic & Nursing Home", "Primary Health Centre (PHC/UPHC)"],
+            index=0,
+            key="overview_hosp_filter"
+        )
+    with col_map_info:
+        st.markdown(
+            "<div style='font-size:12px; color:#475569; margin-top:28px;'>"
+            "📍 <b>கரூர் மாவட்டம் மட்டும் (Karur District Only):</b> Boundary highlighted in blue dash. 🔴 Govt/Apex GMCH, 🔵 Multispeciality Hospitals, 🟢 PHC / Clinics."
+            "</div>",
+            unsafe_allow_html=True
+        )
+
     render_network_map(
         active_route=["S", "J1", "J2", "J4", "J6", "H"],
         ambulance_location=[10.9620, 78.0820],
-        congested_segments=["B2"] if act_sc == "QUEUE_ON_B2" else []
+        congested_segments=["B2"] if act_sc == "QUEUE_ON_B2" else [],
+        category_filter=hosp_cat
     )
 
 # ==========================================
