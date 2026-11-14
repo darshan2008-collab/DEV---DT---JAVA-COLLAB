@@ -20,6 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+from app.rtsp_manager import rtsp_manager
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vision-service")
 
@@ -68,6 +70,9 @@ try:
 except Exception as e:
     model_load_error = str(e)
     logger.warning("Ultralytics library failed to initialize: %s", e)
+
+# Inject YOLO model into RTSP manager
+rtsp_manager.set_model(model, model_loaded)
 
 
 class CalibrationConfig(BaseModel):
@@ -307,6 +312,183 @@ def get_job_status(job_id: str):
     if job_id not in detection_jobs:
         raise HTTPException(status_code=404, detail="Job not found")
     return detection_jobs[job_id]
+
+
+
+# ─────────────────────────────────────────────────────
+#  RTSP LIVE STREAM ENDPOINTS
+# ─────────────────────────────────────────────────────
+
+class RTSPRegisterRequest(BaseModel):
+    stream_id: str
+    rtsp_url: str
+    segment_id: str = "B2"
+    fps_sample: int = 2
+    label: str = ""
+    enabled: bool = True
+
+
+@app.post("/streams/test")
+def test_stream(req: RTSPRegisterRequest):
+    """Probe an IP camera before starting a persistent detection worker."""
+    if not req.rtsp_url.startswith(("rtsp://", "rtsps://", "rtmp://", "http://", "https://")):
+        raise HTTPException(
+            status_code=400,
+            detail="Camera URL must start with rtsp://, rtsps://, rtmp://, http://, or https://"
+        )
+
+    capture = cv2.VideoCapture(req.rtsp_url)
+    capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    opened = capture.isOpened()
+    frame_available = False
+    if opened:
+        frame_available, _ = capture.read()
+    capture.release()
+
+    if not opened or not frame_available:
+        raise HTTPException(
+            status_code=422,
+            detail="Camera connection failed or no video frame was received."
+        )
+
+    return {
+        "stream_id": req.stream_id,
+        "status": "READY",
+        "message": "Camera connection verified and a video frame was received."
+    }
+
+
+@app.post("/streams/register", status_code=201)
+def register_stream(req: RTSPRegisterRequest):
+    """Register and start an RTSP IP camera stream."""
+    # Basic validation
+    if not req.rtsp_url.startswith(("rtsp://", "rtsps://", "rtmp://", "http://", "https://")):
+        raise HTTPException(
+            status_code=400,
+            detail="rtsp_url must start with rtsp://, rtsps://, rtmp://, http://, or https://"
+        )
+    state = rtsp_manager.register(
+        stream_id=req.stream_id,
+        rtsp_url=req.rtsp_url,
+        segment_id=req.segment_id,
+        fps_sample=max(1, req.fps_sample),
+        label=req.label,
+        enabled=req.enabled,
+    )
+    return {
+        "stream_id": req.stream_id,
+        "status": "REGISTERED",
+        "message": f"RTSP stream '{req.stream_id}' registered and worker started.",
+        "metrics_url": f"/streams/{req.stream_id}/metrics",
+        "live_url": f"/streams/{req.stream_id}/live",
+        "snapshot_url": f"/streams/{req.stream_id}/snapshot",
+    }
+
+
+@app.get("/streams")
+def list_streams():
+    """List all registered RTSP streams and their current metrics."""
+    streams = rtsp_manager.list_all()
+    return {
+        "total": len(streams),
+        "streams": streams,
+    }
+
+
+@app.delete("/streams/{stream_id}")
+def unregister_stream(stream_id: str):
+    """Stop and remove an RTSP stream worker."""
+    removed = rtsp_manager.unregister(stream_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Stream '{stream_id}' not found.")
+    return {"stream_id": stream_id, "status": "REMOVED"}
+
+
+@app.get("/streams/{stream_id}/metrics")
+def get_stream_metrics(stream_id: str):
+    """Get current detection metrics for an RTSP stream."""
+    state = rtsp_manager.get(stream_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Stream '{stream_id}' not found.")
+    return state.get_metrics()
+
+
+@app.get("/streams/{stream_id}/snapshot")
+def get_stream_snapshot(stream_id: str):
+    """Return latest annotated JPEG frame from an RTSP stream."""
+    state = rtsp_manager.get(stream_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Stream '{stream_id}' not found.")
+    jpeg_bytes = state.get_latest_jpeg()
+    if jpeg_bytes is None:
+        raise HTTPException(status_code=503, detail="No frame available yet. Stream may still be connecting.")
+    return Response(content=jpeg_bytes, media_type="image/jpeg")
+
+
+from fastapi.responses import StreamingResponse as _StreamingResponse
+import threading as _threading
+
+
+@app.get("/streams/{stream_id}/live")
+def stream_mjpeg(stream_id: str):
+    """
+    MJPEG live stream endpoint — embed in browser as:
+      <img src="http://localhost:8000/streams/CAM-J1/live" />
+    """
+    state = rtsp_manager.get(stream_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Stream '{stream_id}' not found.")
+
+    def frame_generator():
+        while True:
+            jpeg_bytes = state.get_latest_jpeg()
+            if jpeg_bytes is not None:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + jpeg_bytes
+                    + b"\r\n"
+                )
+            else:
+                # Send a placeholder grey frame while stream connects
+                placeholder = np.zeros((240, 320, 3), dtype=np.uint8)
+                placeholder[:] = (40, 40, 40)
+                cv2.putText(placeholder, f"Connecting: {stream_id}",
+                            (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+                _, ph_jpeg = cv2.imencode(".jpg", placeholder)
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + ph_jpeg.tobytes()
+                    + b"\r\n"
+                )
+            time.sleep(0.1)  # ~10 FPS to browser
+
+    return _StreamingResponse(
+        frame_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+
+# Demo: Pre-register simulation streams on startup for testing without real cameras
+@app.on_event("startup")
+async def register_demo_streams():
+    """Auto-register single reference RTSP demo camera for evaluation."""
+    demo_cams = [
+        {
+            "stream_id": "CAM-J2",
+            "rtsp_url": "0",
+            "segment_id": "B2",
+            "label": "Junction 2 - Central Boulevard",
+            "fps_sample": 3,
+        }
+    ]
+    for cam in demo_cams:
+        try:
+            rtsp_manager.register(**cam)
+        except Exception as e:
+            logger.warning("Could not auto-register demo stream %s: %s", cam["stream_id"], e)
+    logger.info("Single reference demo RTSP stream registered (CAM-J2)")
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw
 
 from components.icons import (
     GLOBAL_LIGHT_THEME_CSS, render_header, render_metric_card,
-    render_stepper, render_traffic_light_widget,
+    render_stepper, render_traffic_light_widget, render_sidebar_badge,
     SVG_AMBULANCE, SVG_HOSPITAL, SVG_TRAFFIC_LIGHT, SVG_CHART,
     SVG_CAMERA, SVG_SETTINGS, SVG_DATABASE, SVG_SHIELD, SVG_ROUTE,
     SVG_SPEEDOMETER, SVG_CHECK, SVG_ALERT, SVG_PLAY, SVG_PAUSE, SVG_REFRESH,
@@ -43,6 +43,9 @@ st.set_page_config(
 # Inject Clean High-End Light Theme CSS
 st.markdown(GLOBAL_LIGHT_THEME_CSS, unsafe_allow_html=True)
 
+# Render Branded Sidebar Badge at Top of Navigation (Clean and simple)
+
+
 # Executive Top Header
 st.markdown(
     render_header(
@@ -52,15 +55,6 @@ st.markdown(
     ),
     unsafe_allow_html=True
 )
-
-# Academic Prototype Notice Banner
-st.markdown("""
-<div class="light-alert light-alert-warning">
-    <strong>ACADEMIC PROTOTYPE NOTICE:</strong> Developed by B.Tech Artificial Intelligence & Data Science engineers at 
-    <strong>M. Kumarasamy College of Engineering, Karur</strong> for the Smart India Hackathon. 
-    Unified operations portal streaming edge vision telemetry, optimal pathfinding, and safe-phase intersection state machines.
-</div>
-""", unsafe_allow_html=True)
 
 # Fetch microservices status
 b_health = get_backend_health()

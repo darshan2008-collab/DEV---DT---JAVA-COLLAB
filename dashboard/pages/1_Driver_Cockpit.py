@@ -7,6 +7,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from streamlit_folium import st_folium
 from components.icons import (
+    render_sidebar_badge,
     GLOBAL_LIGHT_THEME_CSS, render_header, render_metric_card,
     SVG_AMBULANCE, SVG_ROUTE, SVG_ALERT, SVG_CHECK, SVG_CROSS, SVG_CLOCK, SVG_SPEEDOMETER
 )
@@ -18,6 +19,7 @@ from components.map_utils import create_network_map, JUNCTION_COORDS
 
 st.set_page_config(page_title="Driver Cockpit HUD", layout="wide")
 st.markdown(GLOBAL_LIGHT_THEME_CSS, unsafe_allow_html=True)
+
 
 # Executive Header
 st.markdown(

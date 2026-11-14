@@ -29,34 +29,21 @@ INSERT INTO roads (id, source_junction, target_junction, distance_km, typical_sp
 ('C1', 'S', 'J3', 5.0, 40.0, 40.0, 7.5, FALSE, 'LOW', CURRENT_TIMESTAMP),
 ('C2', 'J3', 'H', 5.0, 40.0, 40.0, 7.5, FALSE, 'LOW', CURRENT_TIMESTAMP);
 
--- Ambulances
+-- Ambulances (Only 1 primary emergency vehicle retained for project evaluation)
 INSERT INTO ambulances (id, plate_number, model, status, current_lat, current_lon, speed_kmph) VALUES
-('AMB-01', 'TN-47-AM-1001', 'Force Traveller BLS', 'AVAILABLE', 10.9400, 78.0700, 0.0),
-('AMB-02', 'TN-47-AM-1002', 'Tata Winger ALS', 'AVAILABLE', 10.9410, 78.0710, 0.0),
-('AMB-03', 'TN-47-AM-1003', 'Force Traveller ALS (Cardiac Care)', 'AVAILABLE', 10.9420, 78.0690, 0.0),
-('AMB-04', 'TN-47-AM-1004', 'Mahindra Bolero Neo Fast-Response', 'AVAILABLE', 10.9390, 78.0720, 0.0);
+('AMB-01', 'TN-47-AM-1001', 'Force Traveller ALS (Emergency Response)', 'AVAILABLE', 10.9400, 78.0700, 0.0);
 
--- Hospitals
+-- Hospitals (Only 1 primary receiving trauma centre retained for project evaluation)
 INSERT INTO hospitals (id, name, address, latitude, longitude, emergency_contact, total_beds, available_beds, notes) VALUES
-('H-01', 'Karur Government Medical College Hospital (H)', 'Gandhigramam, Karur, TN 639004', 10.9700, 78.0800, '+91-4324-222001', 120, 28, 'Primary trauma centre with designated emergency bay'),
-('H-02', 'Amaravathi Specialty Hospital', 'Kovai Main Road, Karur, TN 639002', 10.9630, 78.0750, '+91-4324-245550', 65, 14, 'Cardiology and neurology ICU equipped'),
-('H-03', 'Apollo Reach Hospital', 'Salem Bypass Road, Karur, TN 639006', 10.9750, 78.0900, '+91-4324-266100', 80, 19, 'Multi-specialty emergency facility');
+('H-01', 'Karur Government Medical College Hospital (H)', 'Gandhigramam, Karur, TN 639004', 10.9700, 78.0800, '+91-4324-222001', 120, 28, 'Primary trauma centre with designated emergency bay');
 
--- Cameras
+-- Cameras (Only 1 active junction camera retained for project evaluation)
 INSERT INTO cameras (id, junction_id, segment_id, ip_or_stream_url, status, resolution, pixels_to_meters_ratio) VALUES
-('CAM-J1', 'J1', 'A1', 'http://simulator/camera/j1', 'ACTIVE', '1920x1080', 25.0),
-('CAM-J2', 'J2', 'B2', 'http://simulator/camera/j2', 'ACTIVE', '1920x1080', 28.5),
-('CAM-J3', 'J3', 'C1', 'http://simulator/camera/j3', 'ACTIVE', '1920x1080', 24.0),
-('CAM-H',  'H',  'B2', 'http://simulator/camera/h',  'ACTIVE', '1920x1080', 30.0);
+('CAM-J2', 'J2', 'B2', 'http://simulator/camera/j2', 'ACTIVE', '1920x1080', 28.5);
 
--- Initial synthetic baseline observations
+-- Initial baseline observation (Only 1 single reference observation for B2)
 INSERT INTO traffic_observations (segment_id, timestamp, vehicle_count, density_veh_per_km, speed_kmph, queue_m, confidence, data_source, is_masked) VALUES
-('A1', CURRENT_TIMESTAMP, 14, 28.0, 30.0, 15.0, 0.92, 'SIMULATION', FALSE),
-('A2', CURRENT_TIMESTAMP, 24, 48.0, 15.0, 75.0, 0.88, 'SIMULATION', FALSE),
-('B1', CURRENT_TIMESTAMP, 10, 20.0, 40.0, 10.0, 0.95, 'SIMULATION', FALSE),
-('B2', CURRENT_TIMESTAMP, 12, 24.0, 40.0, 10.0, 0.94, 'SIMULATION', FALSE),
-('C1', CURRENT_TIMESTAMP, 8,  16.0, 40.0, 5.0,  0.96, 'SIMULATION', FALSE),
-('C2', CURRENT_TIMESTAMP, 9,  18.0, 40.0, 5.0,  0.95, 'SIMULATION', FALSE);
+('B2', CURRENT_TIMESTAMP, 12, 24.0, 40.0, 10.0, 0.94, 'CAMERA_LIVE', FALSE);
 
 -- System Settings
 INSERT INTO system_settings (setting_key, setting_value, description) VALUES

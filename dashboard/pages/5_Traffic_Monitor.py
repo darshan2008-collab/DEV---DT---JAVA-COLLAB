@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 from components.icons import (
+    render_sidebar_badge,
     GLOBAL_LIGHT_THEME_CSS,
     render_header,
     render_metric_card,
@@ -23,6 +24,7 @@ st.set_page_config(
 )
 
 st.markdown(GLOBAL_LIGHT_THEME_CSS, unsafe_allow_html=True)
+
 st.markdown(
     render_header(
         "Real-Time Traffic & Road Segment Analytics",

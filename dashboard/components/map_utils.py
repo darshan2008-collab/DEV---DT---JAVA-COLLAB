@@ -30,10 +30,21 @@ CONGESTION_COLORS = {
 }
 
 
-def create_network_map(traffic_data=None, active_route="Route B", ambulance_pos=None, hospital_pos=None):
-    # Center around Karur
-    center_lat = 10.9550
-    center_lon = 78.0750
+def create_network_map(
+    traffic_data=None,
+    active_route="Route B",
+    ambulance_pos=None,
+    hospital_pos=None,
+    ambulance_location=None,
+    congested_segments=None,
+    **kwargs
+):
+    # Support both ambulance_pos and ambulance_location
+    amb_coord = ambulance_location if ambulance_location is not None else ambulance_pos
+
+    # Center around Karur or ambulance if present
+    center_lat = amb_coord[0] if amb_coord else 10.9550
+    center_lon = amb_coord[1] if amb_coord else 78.0750
     # OpenStreetMap is public and does not require an API key.
     m = folium.Map(
         location=[center_lat, center_lon],
@@ -50,6 +61,12 @@ def create_network_map(traffic_data=None, active_route="Route B", ambulance_pos=
             sid = t.get("segment_id")
             seg_congestion[sid] = t.get("congestion_level", "LOW")
             seg_speeds[sid] = t.get("speed_kmph", 40.0)
+
+    # Override any specific congested segments passed
+    if congested_segments:
+        for cs in congested_segments:
+            seg_congestion[cs] = "HIGH"
+            seg_speeds[cs] = min(seg_speeds.get(cs, 12.0), 12.0)
 
     # Draw all road segments
     for seg_id, path in SEGMENT_PATHS.items():
@@ -107,9 +124,9 @@ def create_network_map(traffic_data=None, active_route="Route B", ambulance_pos=
             ).add_to(m)
 
     # Draw moving Ambulance marker if active
-    if ambulance_pos:
+    if amb_coord:
         folium.Marker(
-            ambulance_pos,
+            amb_coord,
             popup="<b>Emergency Ambulance</b><br>Navigation in progress",
             tooltip="Ambulance (Emergency Mode)",
             icon=folium.Icon(color="darkred", icon="ambulance", prefix="fa")
