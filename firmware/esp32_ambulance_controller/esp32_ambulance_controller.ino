@@ -1,37 +1,43 @@
 /*
  * =========================================================================
  * Smart Ambulance Navigation System - ESP32 Signal & RGB LED Controller
- * Dual Mode: Access Point (AP) + Station (Hotspot Client)
+ * with I2C 0.96" OLED Display (SSD1306) using U8G2 Library
  * =========================================================================
  * 
- * 1. Broadcasts its OWN Wi-Fi Hotspot:
- *    SSID:     ESP32-AMBULANCE-SIGNAL
- *    Password: 12345678
- *    Static IP: 192.168.4.1
- *    (Shows up directly in your Mobile Phone / Laptop Wi-Fi list!)
+ * 1. Hardware Connections:
+ *    --- I2C 0.96" OLED Display (SSD1306) ---
+ *    VCC -> ESP32 3.3V
+ *    GND -> ESP32 GND
+ *    SCL -> ESP32 GPIO 22
+ *    SDA -> ESP32 GPIO 21
  * 
- * 2. Connects simultaneously to Mobile Hotspot:
- *    SSID:     DARSHAN K
- *    Password: 12345678
- * 
- * 3. Controls 4-Pin Common Cathode RGB LED:
- *    Pin 1 (Red)   -> ESP32 GPIO 18 (via 220 Ohm resistor)
+ *    --- 4-Pin Common Cathode RGB LED ---
+ *    Pin 1 (Red)   -> ESP32 GPIO 18 (with 220 Ohm resistor)
  *    Pin 2 (GND)   -> ESP32 GND (Longest lead)
- *    Pin 3 (Green) -> ESP32 GPIO 19 (via 220 Ohm resistor)
- *    Pin 4 (Blue)  -> ESP32 GPIO 23 (via 220 Ohm resistor)
- *    (GPIO 21 SDA and GPIO 22 SCL kept free for I2C 16x2 LCD)
+ *    Pin 3 (Green) -> ESP32 GPIO 19 (with 220 Ohm resistor)
+ *    Pin 4 (Blue)  -> ESP32 GPIO 23 (with 220 Ohm resistor)
+ * 
+ * 2. Wi-Fi Dual Mode:
+ *    - SoftAP Hotspot: "ESP32-AMBULANCE-SIGNAL" (Pass: 12345678) -> IP: 192.168.4.1
+ *    - Station Mode: Connects to Mobile Hotspot "DARSHAN K" (Pass: 12345678)
+ * 
+ * 3. U8G2 Library:
+ *    Install "U8g2" by olikraus from Arduino IDE Library Manager
  * =========================================================================
  */
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include <Wire.h>
+#include <U8g2lib.h>
+
+// U8G2 Constructor for 0.96" I2C SSD1306 128x64 OLED (Full Buffer, Fast & Crisp)
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 22, /* data=*/ 21);
 
 // --- Wi-Fi Configuration ---
-// 1. Mobile Hotspot Details (Station Mode)
 const char* STA_SSID = "DARSHAN K";
 const char* STA_PASS = "12345678";
 
-// 2. ESP32's Own Wi-Fi Hotspot (SoftAP Mode - ALWAYS VISIBLE!)
 const char* AP_SSID  = "ESP32-AMBULANCE-SIGNAL";
 const char* AP_PASS  = "12345678";
 
@@ -48,8 +54,56 @@ String currentColor = "GREEN";
 bool sirenActive = false;
 unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
+String staIpStr = "Connecting...";
 
-// Function to set RGB LED colors (Common Cathode: HIGH = ON, LOW = OFF)
+// Update OLED Screen using U8G2
+void updateOled(String statusText) {
+  u8g2.clearBuffer();
+
+  // Top Banner / Header (Inverted background box)
+  u8g2.setDrawColor(1);
+  u8g2.drawRBox(0, 0, 128, 14, 2);
+  u8g2.setDrawColor(0); // White text on dark box
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(12, 10, "SMART AMBULANCE");
+
+  // Restore normal drawing color
+  u8g2.setDrawColor(1);
+
+  // Line 2: Signal State
+  u8g2.setFont(u8g2_font_7x14B_tf);
+  if (statusText == "RED") {
+    u8g2.drawStr(0, 29, "SIG: [RED] STOP");
+  } else if (statusText == "YELLOW") {
+    u8g2.drawStr(0, 29, "SIG: [YEL] CLEAR");
+  } else if (statusText == "GREEN") {
+    u8g2.drawStr(0, 29, "SIG: [GRN] WAVE");
+  } else if (statusText == "BLUE") {
+    u8g2.drawStr(0, 29, "SIG: [BLU] READY");
+  } else if (statusText == "SIREN") {
+    u8g2.drawStr(0, 29, "SIG: [SIREN] !!!");
+  } else {
+    u8g2.drawStr(0, 29, "SIG: [OFF]");
+  }
+
+  // Divider line
+  u8g2.drawHLine(0, 33, 128);
+
+  // Line 3 & 4: Network IP Info
+  u8g2.setFont(u8g2_font_5x8_tf);
+  u8g2.drawStr(0, 44, "AP IP : 192.168.4.1");
+  
+  String staLine = "STA IP: " + staIpStr;
+  u8g2.drawStr(0, 53, staLine.c_str());
+
+  // Line 5: Bottom Status / District
+  u8g2.setFont(u8g2_font_4x6_tf);
+  u8g2.drawStr(0, 62, "J2 NODE | 100% PREEMPTION ACTIVE");
+
+  u8g2.sendBuffer();
+}
+
+// Function to set RGB LED colors
 void setRGB(int r, int g, int b) {
   analogWrite(PIN_RED,   r);
   analogWrite(PIN_GREEN, g);
@@ -74,6 +128,8 @@ void applyColor(String color) {
     setRGB(0, 0, 0);
     currentColor = "OFF";
   }
+
+  updateOled(currentColor);
 }
 
 // Web Server Handlers
@@ -86,15 +142,16 @@ void handleRoot() {
   html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-blue{background:#0284C7;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
   html += ".status{margin:20px auto; padding:14px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
   html += "</style></head><body>";
-  html += "<h1>ESP32 Signal Head Controller</h1>";
-  html += "<div class='status'>Active Status: <strong style='color:#38BDF8;'>" + currentColor + "</strong></div>";
+  html += "<h1>ESP32 Signal & OLED Controller</h1>";
+  html += "<div class='status'>Active Status: <strong style='color:#38BDF8;'>" + currentColor + "</strong><br>";
+  html += "<small style='color:#94A3B8;'>OLED: SSD1306 I2C (U8G2) Online</small></div>";
   html += "<a class='btn btn-red' href='/red'>RED LIGHT (STOP)</a>";
   html += "<a class='btn btn-yellow' href='/yellow'>YELLOW LIGHT (PREEMPT)</a>";
   html += "<a class='btn btn-green' href='/green'>GREEN LIGHT (CLEAR)</a>";
   html += "<a class='btn btn-blue' href='/blue'>BLUE LIGHT</a>";
   html += "<a class='btn btn-siren' href='/siren'>AMBULANCE SIREN FLASH</a>";
   html += "<a class='btn btn-off' href='/off'>TURN OFF ALL LIGHTS</a>";
-  html += "<p style='font-size:12px; color:#94A3B8; margin-top:25px;'>Smart Ambulance Corridor Priority System</p>";
+  html += "<p style='font-size:12px; color:#94A3B8; margin-top:25px;'>Karur Medical District | Preemption Node</p>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
@@ -136,17 +193,24 @@ void handleOff() {
 }
 
 void handleStatus() {
-  String json = "{\"status\":\"online\",\"color\":\"" + currentColor + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\"}";
+  String json = "{\"status\":\"online\",\"color\":\"" + currentColor + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"display\":\"OLED_U8G2\"}";
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", json);
 }
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
-  Serial.println("\n\n========================================");
-  Serial.println("  ESP32 SMART AMBULANCE SIGNAL HEAD");
-  Serial.println("========================================");
+  delay(500);
+
+  // Initialize U8G2 OLED Display
+  u8g2.begin();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_7x14B_tf);
+  u8g2.drawStr(10, 24, "SMART AMBULANCE");
+  u8g2.setFont(u8g2_font_6x10_tf);
+  u8g2.drawStr(16, 44, "Booting ESP32...");
+  u8g2.drawStr(22, 58, "OLED (U8G2)");
+  u8g2.sendBuffer();
 
   // Configure Pins
   pinMode(PIN_RED, OUTPUT);
@@ -154,51 +218,42 @@ void setup() {
   pinMode(PIN_BLUE, OUTPUT);
   pinMode(PIN_ONBOARD_LED, OUTPUT);
   
-  // Test sequence: Blink onboard LED and cycle RGB colors
+  // Power-on test sequence
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setRGB(255, 0, 0); delay(400);
-  setRGB(0, 255, 0); delay(400);
-  setRGB(0, 0, 255); delay(400);
+  setRGB(255, 0, 0); delay(300);
+  setRGB(0, 255, 0); delay(300);
+  setRGB(0, 0, 255); delay(300);
   setRGB(0, 0, 0);   delay(200);
 
-  // Set Wi-Fi Mode to DUAL (AP + STA)
+  // Wi-Fi Dual Mode: AP + STA
   WiFi.mode(WIFI_AP_STA);
 
-  // 1. Start ESP32's OWN Wi-Fi Hotspot (Visible to all phones & laptops!)
-  Serial.println("[Wi-Fi] Starting ESP32 Hotspot (AP)...");
+  // 1. Start SoftAP Hotspot
   WiFi.softAP(AP_SSID, AP_PASS);
-  Serial.print("[Wi-Fi] Broadcast SSID: ");
-  Serial.println(AP_SSID);
-  Serial.print("[Wi-Fi] AP IP Address:  http://");
-  Serial.println(WiFi.softAPIP());
+  Serial.println("[Wi-Fi] SoftAP Started: " + String(AP_SSID));
 
-  // 2. Connect to Mobile Hotspot 'DARSHAN K'
-  Serial.print("[Wi-Fi] Connecting to Mobile Hotspot '");
-  Serial.print(STA_SSID);
-  Serial.println("' (Must be 2.4 GHz)...");
-  
+  // 2. Connect to Mobile Hotspot
+  Serial.println("[Wi-Fi] Connecting to: " + String(STA_SSID));
   WiFi.begin(STA_SSID, STA_PASS);
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 15) {
-    delay(500);
-    Serial.print(".");
+  while (WiFi.status() != WL_CONNECTED && attempts < 12) {
+    delay(400);
     digitalWrite(PIN_ONBOARD_LED, !digitalRead(PIN_ONBOARD_LED));
     attempts++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[Wi-Fi] Connected to Mobile Hotspot successfully!");
-    Serial.print("[Wi-Fi] Mobile Hotspot IP: http://");
-    Serial.println(WiFi.localIP());
+    staIpStr = WiFi.localIP().toString();
+    Serial.println("[Wi-Fi] Connected! STA IP: " + staIpStr);
     digitalWrite(PIN_ONBOARD_LED, HIGH);
   } else {
-    Serial.println("\n[Wi-Fi] Mobile Hotspot not reached. Continuing in Standalone AP Mode.");
-    Serial.println("[Wi-Fi] Tip: Ensure Mobile Hotspot 'AP Band' is set to 2.4 GHz!");
+    staIpStr = "Offline (AP only)";
+    Serial.println("[Wi-Fi] Hotspot not found. Running in standalone AP mode.");
     digitalWrite(PIN_ONBOARD_LED, LOW);
   }
 
-  // Set default initial light: GREEN
+  // Initial State: GREEN Wave
   applyColor("GREEN");
 
   // Web Server Endpoints
@@ -212,14 +267,13 @@ void setup() {
   server.on("/status", handleStatus);
 
   server.begin();
-  Serial.println("[HTTP] Web Server Started!");
-  Serial.println("========================================\n");
+  Serial.println("[HTTP] Server ready on http://192.168.4.1");
 }
 
 void loop() {
   server.handleClient();
 
-  // Emergency Siren Animation (Red & Blue Alternate Flashing)
+  // Emergency Siren Animation (Alternate Red / Blue Flash)
   if (sirenActive) {
     unsigned long currentMillis = millis();
     if (currentMillis - lastSirenToggle >= 120) {
