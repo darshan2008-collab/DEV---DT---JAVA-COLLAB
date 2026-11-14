@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_navy">#0F172A</color>
+    <color name="surface_slate">#1E293B</color>
+    <color name="border_slate">#334155</color>
+    <color name="medical_blue">#0284C7</color>
+    <color name="medical_blue_dark">#0369A1</color>
+    <color name="background_light">#F8FAFC</color>
+    <color name="card_white">#FFFFFF</color>
+    
+    <!-- Signal Hardware Colors -->
+    <color name="signal_red">#EF4444</color>
+    <color name="signal_red_dark">#DC2626</color>
+    <color name="signal_yellow">#F59E0B</color>
+    <color name="signal_yellow_dark">#D97706</color>
+    <color name="signal_green">#10B981</color>
+    <color name="signal_green_dark">#059669</color>
+    <color name="signal_blue">#0284C7</color>
+    <color name="signal_blue_dark">#0369A1</color>
+    <color name="signal_siren">#EC4899</color>
+    <color name="signal_siren_dark">#DB2777</color>
+    <color name="signal_off">#475569</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_white">#FFFFFF</color>
+</resources>
