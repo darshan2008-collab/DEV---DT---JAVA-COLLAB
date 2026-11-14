@@ -1,7 +1,8 @@
 /*
  * =========================================================================
- * Smart Ambulance Navigation System - ESP32 Signal & RGB LED Controller
- * with I2C 0.96" OLED Display (SSD1306) using U8G2 Library
+ * Smart Ambulance Navigation System - ESP32 Miniature Traffic Light Controller
+ * Hardware: 3-LED Traffic Light Module (R, Y, G, GND) + I2C 0.96" OLED (SSD1306)
+ * Library: U8G2 (by olikraus)
  * =========================================================================
  */
 
@@ -10,56 +11,49 @@
 #include <Wire.h>
 #include <U8g2lib.h>
 
-// U8G2 Constructor for 0.96" I2C SSD1306 128x64 OLED (Full Buffer, Fast & Crisp)
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 22, /* data=*/ 21);
 
-// --- Wi-Fi Configuration ---
 const char* STA_SSID = "DARSHAN K";
 const char* STA_PASS = "12345678";
 
 const char* AP_SSID  = "ESP32-AMBULANCE-SIGNAL";
 const char* AP_PASS  = "12345678";
 
-// --- Hardware Pins ---
 #define PIN_RED    18
-#define PIN_GREEN  19
-#define PIN_BLUE   23
+#define PIN_YELLOW 19
+#define PIN_GREEN  23
 #define PIN_ONBOARD_LED 2
-
-bool isCommonAnode = false;
 
 WebServer server(80);
 
-String currentColor = "GREEN";
+String currentSignal = "GREEN";
 bool sirenActive = false;
 unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
 String staIpStr = "Connecting...";
 
-void updateOled(String statusText) {
+void updateOled(String signalName) {
   u8g2.clearBuffer();
 
   u8g2.setDrawColor(1);
   u8g2.drawRBox(0, 0, 128, 14, 2);
   u8g2.setDrawColor(0);
   u8g2.setFont(u8g2_font_6x10_tf);
-  u8g2.drawStr(12, 10, "SMART AMBULANCE");
+  u8g2.drawStr(10, 10, "SMART AMBULANCE J2");
 
   u8g2.setDrawColor(1);
 
   u8g2.setFont(u8g2_font_7x14B_tf);
-  if (statusText == "RED") {
-    u8g2.drawStr(0, 29, "SIG: [RED] STOP");
-  } else if (statusText == "YELLOW") {
-    u8g2.drawStr(0, 29, "SIG: [YEL] CLEAR");
-  } else if (statusText == "GREEN") {
-    u8g2.drawStr(0, 29, "SIG: [GRN] WAVE");
-  } else if (statusText == "BLUE") {
-    u8g2.drawStr(0, 29, "SIG: [BLU] READY");
-  } else if (statusText == "SIREN") {
-    u8g2.drawStr(0, 29, "SIG: [SIREN] !!!");
+  if (signalName == "RED") {
+    u8g2.drawStr(0, 29, "TRAFFIC: [RED] STOP");
+  } else if (signalName == "YELLOW") {
+    u8g2.drawStr(0, 29, "TRAFFIC: [YEL] CLEAR");
+  } else if (signalName == "GREEN") {
+    u8g2.drawStr(0, 29, "TRAFFIC: [GRN] GO-AMB");
+  } else if (signalName == "SIREN") {
+    u8g2.drawStr(0, 29, "TRAFFIC: [EMERGENCY]");
   } else {
-    u8g2.drawStr(0, 29, "SIG: [OFF]");
+    u8g2.drawStr(0, 29, "TRAFFIC: [ALL OFF]");
   }
 
   u8g2.drawHLine(0, 33, 128);
@@ -71,67 +65,56 @@ void updateOled(String statusText) {
   u8g2.drawStr(0, 53, staLine.c_str());
 
   u8g2.setFont(u8g2_font_4x6_tf);
-  u8g2.drawStr(0, 62, "J2 NODE | 100% PREEMPTION ACTIVE");
+  u8g2.drawStr(0, 62, "KARUR MEDICAL CORRIDOR | ACTIVE");
 
   u8g2.sendBuffer();
 }
 
-void setRGB(bool r, bool g, bool b) {
-  if (isCommonAnode) {
-    digitalWrite(PIN_RED,   r ? LOW : HIGH);
-    digitalWrite(PIN_GREEN, g ? LOW : HIGH);
-    digitalWrite(PIN_BLUE,  b ? LOW : HIGH);
-  } else {
-    digitalWrite(PIN_RED,   r ? HIGH : LOW);
-    digitalWrite(PIN_GREEN, g ? HIGH : LOW);
-    digitalWrite(PIN_BLUE,  b ? HIGH : LOW);
-  }
+void setTrafficLights(bool red, bool yellow, bool green) {
+  digitalWrite(PIN_RED,    red    ? HIGH : LOW);
+  digitalWrite(PIN_YELLOW, yellow ? HIGH : LOW);
+  digitalWrite(PIN_GREEN,  green  ? HIGH : LOW);
 }
 
-void applyColor(String color) {
-  color.toUpperCase();
+void applySignal(String signal) {
+  signal.toUpperCase();
   sirenActive = false;
-  currentColor = color;
-  
-  if (color == "RED") {
-    setRGB(true, false, false);
-  } else if (color == "YELLOW") {
-    setRGB(true, true, false);
-  } else if (color == "GREEN") {
-    setRGB(false, true, false);
-  } else if (color == "BLUE") {
-    setRGB(false, false, true);
-  } else if (color == "SIREN") {
+  currentSignal = signal;
+
+  if (signal == "RED") {
+    setTrafficLights(true, false, false);
+  } else if (signal == "YELLOW") {
+    setTrafficLights(false, true, false);
+  } else if (signal == "GREEN") {
+    setTrafficLights(false, false, true);
+  } else if (signal == "SIREN") {
     sirenActive = true;
   } else {
-    setRGB(false, false, false);
-    currentColor = "OFF";
+    setTrafficLights(false, false, false);
+    currentSignal = "OFF";
   }
 
-  updateOled(currentColor);
+  updateOled(currentSignal);
 }
 
 void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-  html += "<title>ESP32 Ambulance Signal Head</title>";
+  html += "<title>Traffic Signal Module Controller</title>";
   html += "<style>body{font-family:sans-serif; text-align:center; background:#0F172A; color:#F8FAFC; padding:20px;}";
-  html += "h1{color:#38BDF8; font-size:22px;}";
+  html += "h1{color:#38BDF8; font-size:20px;}";
   html += ".btn{display:block; width:85%; max-width:320px; margin:10px auto; padding:14px; font-size:16px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white;}";
-  html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-blue{background:#0284C7;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
+  html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
   html += ".status{margin:16px auto; padding:12px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
-  html += ".toggle-box{margin:10px auto; padding:8px; font-size:12px; color:#94A3B8;}";
   html += "</style></head><body>";
-  html += "<h1>ESP32 Signal & OLED Controller</h1>";
-  html += "<div class='status'>Active Light: <strong style='color:#38BDF8;'>" + currentColor + "</strong><br>";
-  html += "<small style='color:#94A3B8;'>LED Mode: " + String(isCommonAnode ? "Common Anode (3.3V)" : "Common Cathode (GND)") + "</small></div>";
-  html += "<a class='btn btn-red' href='/red'>RED LIGHT (STOP)</a>";
-  html += "<a class='btn btn-yellow' href='/yellow'>YELLOW LIGHT (PREEMPT)</a>";
-  html += "<a class='btn btn-green' href='/green'>GREEN LIGHT (CLEAR)</a>";
-  html += "<a class='btn btn-blue' href='/blue'>BLUE LIGHT</a>";
-  html += "<a class='btn btn-siren' href='/siren'>AMBULANCE SIREN FLASH</a>";
+  html += "<h1>ESP32 Traffic Signal Controller</h1>";
+  html += "<div class='status'>Active Signal: <strong style='color:#38BDF8;'>" + currentSignal + "</strong><br>";
+  html += "<small style='color:#94A3B8;'>Hardware: 3-LED Module (R, Y, G) + OLED</small></div>";
+  html += "<a class='btn btn-red' href='/red'>RED LIGHT (STOP TRAFFIC)</a>";
+  html += "<a class='btn btn-yellow' href='/yellow'>YELLOW LIGHT (CLEARANCE)</a>";
+  html += "<a class='btn btn-green' href='/green'>GREEN LIGHT (AMBULANCE GO)</a>";
+  html += "<a class='btn btn-siren' href='/siren'>EMERGENCY SIREN FLASH</a>";
   html += "<a class='btn btn-off' href='/off'>TURN OFF ALL LIGHTS</a>";
-  html += "<div class='toggle-box'><a style='color:#38BDF8;' href='/toggle_mode'>Switch LED Mode (Cathode/Anode)</a></div>";
-  html += "<p style='font-size:12px; color:#94A3B8; margin-top:20px;'>Karur Medical District | Preemption Node</p>";
+  html += "<p style='font-size:12px; color:#94A3B8; margin-top:20px;'>Karur Medical District | Corridor Node J2</p>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
@@ -139,30 +122,23 @@ void handleRoot() {
 void handleSet() {
   if (server.hasArg("color")) {
     String c = server.arg("color");
-    applyColor(c);
+    applySignal(c);
     server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.send(200, "text/plain", "OK: " + currentColor);
+    server.send(200, "text/plain", "OK: " + currentSignal);
   } else {
     server.send(400, "text/plain", "Missing color parameter");
   }
 }
 
-void handleRed()    { applyColor("RED");    server.sendHeader("Location", "/"); server.send(303); }
-void handleYellow() { applyColor("YELLOW"); server.sendHeader("Location", "/"); server.send(303); }
-void handleGreen()  { applyColor("GREEN");  server.sendHeader("Location", "/"); server.send(303); }
-void handleBlue()   { applyColor("BLUE");   server.sendHeader("Location", "/"); server.send(303); }
-void handleSiren()  { applyColor("SIREN");  server.sendHeader("Location", "/"); server.send(303); }
-void handleOff()    { applyColor("OFF");    server.sendHeader("Location", "/"); server.send(303); }
-
-void handleToggleMode() {
-  isCommonAnode = !isCommonAnode;
-  applyColor(currentColor);
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
+void handleRed()    { applySignal("RED");    server.sendHeader("Location", "/"); server.send(303); }
+void handleYellow() { applySignal("YELLOW"); server.sendHeader("Location", "/"); server.send(303); }
+void handleGreen()  { applySignal("GREEN");  server.sendHeader("Location", "/"); server.send(303); }
+void handleBlue()   { applySignal("GREEN");  server.sendHeader("Location", "/"); server.send(303); }
+void handleSiren()  { applySignal("SIREN");  server.sendHeader("Location", "/"); server.send(303); }
+void handleOff()    { applySignal("OFF");    server.sendHeader("Location", "/"); server.send(303); }
 
 void handleStatus() {
-  String json = "{\"status\":\"online\",\"color\":\"" + currentColor + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"led_mode\":\"" + String(isCommonAnode ? "ANODE" : "CATHODE") + "\"}";
+  String json = "{\"status\":\"online\",\"signal\":\"" + currentSignal + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"module\":\"TRAFFIC_LIGHT_3LED\"}";
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", json);
 }
@@ -174,22 +150,22 @@ void setup() {
   u8g2.begin();
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_7x14B_tf);
-  u8g2.drawStr(10, 24, "SMART AMBULANCE");
+  u8g2.drawStr(6, 24, "TRAFFIC SIGNAL J2");
   u8g2.setFont(u8g2_font_6x10_tf);
-  u8g2.drawStr(16, 44, "Booting ESP32...");
-  u8g2.drawStr(22, 58, "OLED (U8G2)");
+  u8g2.drawStr(14, 44, "Booting ESP32...");
+  u8g2.drawStr(10, 58, "Hardware: R-Y-G");
   u8g2.sendBuffer();
 
   pinMode(PIN_RED, OUTPUT);
+  pinMode(PIN_YELLOW, OUTPUT);
   pinMode(PIN_GREEN, OUTPUT);
-  pinMode(PIN_BLUE, OUTPUT);
   pinMode(PIN_ONBOARD_LED, OUTPUT);
-  
+
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setRGB(true, false, false); delay(400);
-  setRGB(false, true, false); delay(400);
-  setRGB(false, false, true); delay(400);
-  setRGB(false, false, false);delay(200);
+  setTrafficLights(true, false, false); delay(400);
+  setTrafficLights(false, true, false); delay(400);
+  setTrafficLights(false, false, true); delay(400);
+  setTrafficLights(false, false, false);delay(200);
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(AP_SSID, AP_PASS);
@@ -210,7 +186,7 @@ void setup() {
     digitalWrite(PIN_ONBOARD_LED, LOW);
   }
 
-  applyColor("GREEN");
+  applySignal("GREEN");
 
   server.on("/", handleRoot);
   server.on("/set", handleSet);
@@ -220,7 +196,6 @@ void setup() {
   server.on("/blue", handleBlue);
   server.on("/siren", handleSiren);
   server.on("/off", handleOff);
-  server.on("/toggle_mode", handleToggleMode);
   server.on("/status", handleStatus);
 
   server.begin();
@@ -231,13 +206,13 @@ void loop() {
 
   if (sirenActive) {
     unsigned long currentMillis = millis();
-    if (currentMillis - lastSirenToggle >= 120) {
+    if (currentMillis - lastSirenToggle >= 150) {
       lastSirenToggle = currentMillis;
       sirenFlip = !sirenFlip;
       if (sirenFlip) {
-        setRGB(true, false, false);
+        setTrafficLights(true, false, false);
       } else {
-        setRGB(false, false, true);
+        setTrafficLights(false, false, true);
       }
     }
   }
