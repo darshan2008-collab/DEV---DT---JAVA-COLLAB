@@ -445,7 +445,7 @@ def create_network_map(
             seg_congestion[sid] = t.get("congestion_level", "LOW")
             seg_speeds[sid] = t.get("speed_kmph", 40.0)
 
-    for seg_id, path in SEGMENT_PATHS.items:
+    for seg_id, path in SEGMENT_PATHS.items():
         cong = seg_congestion.get(seg_id, "LOW")
         speed = seg_speeds.get(seg_id, 40.0)
         color = CONGESTION_COLORS.get(cong, "#2ECC71")
@@ -472,7 +472,7 @@ def create_network_map(
         ).add_to(m)
 
     # 3. Draw Corridor Junctions (S, J1, J2, J3)
-    for jid, coords in JUNCTION_COORDS.items:
+    for jid, coords in JUNCTION_COORDS.items():
         if jid == "S":
             folium.Marker(
                 coords,
