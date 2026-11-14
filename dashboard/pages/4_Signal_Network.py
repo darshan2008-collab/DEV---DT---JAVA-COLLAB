@@ -45,11 +45,11 @@ st.markdown(
 # Top Status Metrics Bar & ESP32 Live Auto-Probe
 esp32_ip = st.session_state.get("esp_ip_addr", "192.168.4.1")
 
-# Fast non-blocking background connection probe
+# Ultra-fast non-blocking connection probe (300ms max)
 esp_connected = False
 try:
     import requests
-    _r = requests.get(f"http://{esp32_ip}/status", timeout=0.6)
+    _r = requests.get(f"http://{esp32_ip}/status", timeout=0.35)
     if _r.status_code == 200:
         esp_connected = True
         st.session_state["esp_connected"] = True
@@ -74,9 +74,9 @@ with s5:
 st.write("")
 
 # REAL-TIME SIGNAL HEAD & PHASE SIMULATOR
-st.subheader("Physical ESP32 Edge Signal Head & Live RGB Hardware Controller")
+st.subheader("Physical ESP32 Edge Signal Head & Live Traffic Light Controller")
 
-# Prominent Hardware Connection & RGB Color Switcher
+# Prominent Hardware Connection & Traffic Light Switcher
 with st.container(border=True):
     col_conn1, col_conn2 = st.columns([7, 5])
     
@@ -86,7 +86,7 @@ with st.container(border=True):
             "Enter your ESP32 Wi-Fi IP Address:",
             value=esp32_ip,
             key="input_esp_ip_addr",
-            help="Check the IP address shown on your OLED Display or Arduino Serial Monitor (Default: 192.168.4.1)"
+            help="SoftAP default: 192.168.4.1 | Or enter STA IP shown on your OLED Display"
         )
         st.session_state["esp_ip_addr"] = esp32_ip_input
         esp32_ip = esp32_ip_input
@@ -98,7 +98,7 @@ with st.container(border=True):
         if ping_btn:
             import requests
             try:
-                r = requests.get(f"http://{esp32_ip}/status", timeout=1.5)
+                r = requests.get(f"http://{esp32_ip}/status", timeout=0.6)
                 if r.status_code == 200:
                     st.session_state["esp_connected"] = True
                     esp_connected = True
@@ -108,87 +108,70 @@ with st.container(border=True):
                     st.warning(f"ESP32 returned HTTP {r.status_code}")
             except Exception as e:
                 st.session_state["esp_connected"] = False
-                st.warning(f"Could not connect to http://{esp32_ip} (Ensure ESP32 is powered ON)")
+                st.warning(f"Could not connect to http://{esp32_ip} (Check Wi-Fi network)")
 
-    # Prominent Dynamic Connection Status Banner
+    # Dynamic Connection Status Banner & Network Helper
     if st.session_state.get("esp_connected", False):
-        st.success(f"**ESP32 HARDWARE CONNECTED** — Node J2 Online at `http://{esp32_ip}` (OLED Display & 4-Pin RGB Ready)")
+        st.success(f"**ESP32 HARDWARE CONNECTED** — Node J2 Online at `http://{esp32_ip}` (OLED & Traffic Light Active)")
     else:
-        st.warning(f"**ESP32 DISCONNECTED** — Please connect your PC/Phone to Wi-Fi **ESP32-AMBULANCE-SIGNAL** (IP: `192.168.4.1`) or check power.")
+        st.info(f"**Wi-Fi Connection Guide:**\n- **Option 1 (Direct Hotspot):** Connect laptop Wi-Fi to **`ESP32-AMBULANCE-SIGNAL`** -> IP is **`192.168.4.1`**.\n- **Option 2 (Mobile Hotspot):** If ESP32 is on mobile hotspot **`DARSHAN K`**, check the **STA IP** shown on your OLED display (e.g. `192.168.43.xxx`) and enter it above.")
 
     st.markdown("---")
-    st.markdown("#### Direct Physical RGB Light Switcher")
-    st.caption("Click any button below to instantly change the physical 4-Pin RGB LED light color on your breadboard:")
+    st.markdown("#### Direct Physical Traffic Light Switcher (Zero-Lag)")
+    st.caption("Click any button below to instantly trigger the physical 3-LED Traffic Light module (Red, Yellow, Green):")
     
-    col_b1, col_b2, col_b3, col_b4, col_b5, col_b6 = st.columns(6)
+    col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
     
     import requests
-    def trigger_esp(target_ip, color_code):
-        color_lower = color_code.lower()
-        # 1. Try direct REST endpoint (/red, /green, /yellow, /blue, /siren, /off)
+    def trigger_esp_fast(target_ip, color_code):
+        color_code_up = color_code.upper()
+        # Fast direct non-blocking call (300ms timeout)
         try:
-            url = f"http://{target_ip}/{color_lower}"
-            r = requests.get(url, timeout=1.5)
-            if r.status_code in [200, 303]:
-                return True, f"Hardware {color_code} Active"
+            url = f"http://{target_ip}/set?color={color_code_up}"
+            r = requests.get(url, timeout=0.35)
+            if r.status_code == 200:
+                return True, f"Hardware {color_code_up} Active"
         except Exception:
             pass
-        # 2. Fallback to /set?color=...
+        # Fallback to direct path
         try:
-            url = f"http://{target_ip}/set?color={color_code}"
-            r = requests.get(url, timeout=1.5)
-            if r.status_code == 200:
-                return True, f"Hardware {color_code} Active"
-        except Exception as e:
+            url = f"http://{target_ip}/{color_code.lower()}"
+            r = requests.get(url, timeout=0.35)
+            if r.status_code in [200, 303]:
+                return True, f"Hardware {color_code_up} Active"
+        except Exception:
             return False, f"Could not reach http://{target_ip}"
         return False, f"Could not reach http://{target_ip}"
 
     with col_b1:
         if st.button("RED Signal (Stop)", use_container_width=True, type="secondary"):
-            ok, m = trigger_esp(esp32_ip, "RED")
+            ok, m = trigger_esp_fast(esp32_ip, "RED")
             if ok: st.success("RED ON")
             else: st.warning(m)
             
     with col_b2:
-        if st.button("YELLOW Signal", use_container_width=True, type="secondary"):
-            ok, m = trigger_esp(esp32_ip, "YELLOW")
+        if st.button("YELLOW (Clear)", use_container_width=True, type="secondary"):
+            ok, m = trigger_esp_fast(esp32_ip, "YELLOW")
             if ok: st.success("YELLOW ON")
             else: st.warning(m)
 
     with col_b3:
         if st.button("GREEN Priority", use_container_width=True, type="primary"):
-            ok, m = trigger_esp(esp32_ip, "GREEN")
+            ok, m = trigger_esp_fast(esp32_ip, "GREEN")
             if ok: st.success("GREEN ON")
             else: st.warning(m)
 
     with col_b4:
-        if st.button("BLUE Light", use_container_width=True):
-            ok, m = trigger_esp(esp32_ip, "BLUE")
-            if ok: st.info("BLUE ON")
-            else: st.warning(m)
-
-    with col_b5:
         if st.button("Siren Flasher", use_container_width=True):
-            ok, m = trigger_esp(esp32_ip, "SIREN")
+            ok, m = trigger_esp_fast(esp32_ip, "SIREN")
             if ok: st.info("Siren Active")
             else: st.warning(m)
 
-    with col_b6:
-        if st.button("Turn OFF Light", use_container_width=True):
-            ok, m = trigger_esp(esp32_ip, "OFF")
-            if ok: st.info("LED OFF")
+    with col_b5:
+        if st.button("Turn OFF All", use_container_width=True):
+            ok, m = trigger_esp_fast(esp32_ip, "OFF")
+            if ok: st.info("Signals OFF")
             else: st.warning(m)
-
-    # Helper for Common Cathode vs Common Anode polarity
-    st.caption("Common Cathode (GND) vs Common Anode (3.3V) hardware polarity switcher:")
-    col_t1, col_t2 = st.columns([5, 7])
-    with col_t1:
-        if st.button("Switch LED Mode (Cathode ↔ Anode)", use_container_width=True):
-            try:
-                r = requests.get(f"http://{esp32_ip}/toggle_mode", timeout=1.5)
-                st.info("LED polarity mode toggled on ESP32!")
-            except Exception as e:
-                st.warning(f"Could not reach ESP32 at {esp32_ip}")
 
 st.write("")
 

@@ -3,26 +3,23 @@
  * Smart Ambulance Navigation System - ESP32 Miniature Traffic Light Controller
  * Hardware: 3-LED Traffic Light Module (R, Y, G, GND) + I2C 0.96" OLED (SSD1306)
  * Library: U8G2 (by olikraus)
+ * Zero-Latency Architecture: Instant HTTP 200 responses, no redirects
  * =========================================================================
  * 
- * HARDWARE WIRING (Direct Jumper Connections):
+ * HARDWARE CONNECTIONS:
  * 
  * 1. TRAFFIC LIGHT MODULE (Printed: G, Y, R, GND):
  *    [GND] Pin -> ESP32 GND
  *    [ R ] Pin -> ESP32 GPIO 18 (Red LED)
  *    [ Y ] Pin -> ESP32 GPIO 19 (Yellow LED)
  *    [ G ] Pin -> ESP32 GPIO 23 (Green LED)
- *    (Note: 330 Ohm resistors are already built onto this module!)
+ *    (330 Ohm resistors are already integrated on the PCB module!)
  * 
  * 2. 0.96" I2C OLED DISPLAY (SSD1306):
  *    [VCC] Pin -> ESP32 3.3V
  *    [GND] Pin -> ESP32 GND
  *    [SCL] Pin -> ESP32 GPIO 22
  *    [SDA] Pin -> ESP32 GPIO 21
- * 
- * 3. WI-FI & CONTROLLER:
- *    - SoftAP Hotspot: "ESP32-AMBULANCE-SIGNAL" (Pass: 12345678) -> IP: 192.168.4.1
- *    - Station Mode: Connects to Mobile Hotspot "DARSHAN K" (Pass: 12345678)
  * =========================================================================
  */
 
@@ -129,24 +126,26 @@ void applySignal(String signal) {
   updateOled(currentSignal);
 }
 
-// Web Server Handlers
+// Web Server Handlers (Instant HTTP 200, Zero-Lag Execution)
 void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
   html += "<title>Traffic Signal Module Controller</title>";
   html += "<style>body{font-family:sans-serif; text-align:center; background:#0F172A; color:#F8FAFC; padding:20px;}";
   html += "h1{color:#38BDF8; font-size:20px;}";
-  html += ".btn{display:block; width:85%; max-width:320px; margin:10px auto; padding:14px; font-size:16px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white;}";
+  html += ".btn{display:block; width:85%; max-width:320px; margin:10px auto; padding:14px; font-size:16px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white; cursor:pointer;}";
   html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
   html += ".status{margin:16px auto; padding:12px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
-  html += "</style></head><body>";
+  html += "</style><script>";
+  html += "function sendCmd(cmd){fetch('/' + cmd).then(r=>location.reload());}";
+  html += "</script></head><body>";
   html += "<h1>ESP32 Traffic Signal Controller</h1>";
   html += "<div class='status'>Active Signal: <strong style='color:#38BDF8;'>" + currentSignal + "</strong><br>";
   html += "<small style='color:#94A3B8;'>Hardware: 3-LED Module (R, Y, G) + OLED</small></div>";
-  html += "<a class='btn btn-red' href='/red'>RED LIGHT (STOP TRAFFIC)</a>";
-  html += "<a class='btn btn-yellow' href='/yellow'>YELLOW LIGHT (CLEARANCE)</a>";
-  html += "<a class='btn btn-green' href='/green'>GREEN LIGHT (AMBULANCE GO)</a>";
-  html += "<a class='btn btn-siren' href='/siren'>EMERGENCY SIREN FLASH</a>";
-  html += "<a class='btn btn-off' href='/off'>TURN OFF ALL LIGHTS</a>";
+  html += "<button class='btn btn-red' onclick=\"sendCmd('red')\">RED LIGHT (STOP TRAFFIC)</button>";
+  html += "<button class='btn btn-yellow' onclick=\"sendCmd('yellow')\">YELLOW LIGHT (CLEARANCE)</button>";
+  html += "<button class='btn btn-green' onclick=\"sendCmd('green')\">GREEN LIGHT (AMBULANCE GO)</button>";
+  html += "<button class='btn btn-siren' onclick=\"sendCmd('siren')\">EMERGENCY SIREN FLASH</button>";
+  html += "<button class='btn btn-off' onclick=\"sendCmd('off')\">TURN OFF ALL LIGHTS</button>";
   html += "<p style='font-size:12px; color:#94A3B8; margin-top:20px;'>Karur Medical District | Corridor Node J2</p>";
   html += "</body></html>";
   server.send(200, "text/html", html);
@@ -164,12 +163,13 @@ void handleSet() {
   }
 }
 
-void handleRed()    { applySignal("RED");    server.sendHeader("Location", "/"); server.send(303); }
-void handleYellow() { applySignal("YELLOW"); server.sendHeader("Location", "/"); server.send(303); }
-void handleGreen()  { applySignal("GREEN");  server.sendHeader("Location", "/"); server.send(303); }
-void handleBlue()   { applySignal("GREEN");  server.sendHeader("Location", "/"); server.send(303); } // Fallback to green
-void handleSiren()  { applySignal("SIREN");  server.sendHeader("Location", "/"); server.send(303); }
-void handleOff()    { applySignal("OFF");    server.sendHeader("Location", "/"); server.send(303); }
+// Direct Instant 200 Handlers (Fast Sub-millisecond Execution)
+void handleRed()    { applySignal("RED");    server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: RED"); }
+void handleYellow() { applySignal("YELLOW"); server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: YELLOW"); }
+void handleGreen()  { applySignal("GREEN");  server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: GREEN"); }
+void handleBlue()   { applySignal("GREEN");  server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: GREEN"); }
+void handleSiren()  { applySignal("SIREN");  server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: SIREN"); }
+void handleOff()    { applySignal("OFF");    server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: OFF"); }
 
 void handleStatus() {
   String json = "{\"status\":\"online\",\"signal\":\"" + currentSignal + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"module\":\"TRAFFIC_LIGHT_3LED\"}";
@@ -179,7 +179,7 @@ void handleStatus() {
 
 void setup() {
   Serial.begin(115200);
-  delay(500);
+  delay(300);
 
   // 1. Initialize U8G2 OLED Display
   u8g2.begin();
@@ -199,10 +199,10 @@ void setup() {
 
   // 3. Hardware Self-Test: Cycle Red -> Yellow -> Green
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setTrafficLights(true, false, false); delay(400); // Red ON
-  setTrafficLights(false, true, false); delay(400); // Yellow ON
-  setTrafficLights(false, false, true); delay(400); // Green ON
-  setTrafficLights(false, false, false);delay(200); // All OFF
+  setTrafficLights(true, false, false); delay(350); // Red ON
+  setTrafficLights(false, true, false); delay(350); // Yellow ON
+  setTrafficLights(false, false, true); delay(350); // Green ON
+  setTrafficLights(false, false, false);delay(150); // All OFF
 
   // 4. Wi-Fi Dual Mode: AP + STA
   WiFi.mode(WIFI_AP_STA);
@@ -211,8 +211,8 @@ void setup() {
 
   WiFi.begin(STA_SSID, STA_PASS);
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 12) {
-    delay(400);
+  while (WiFi.status() != WL_CONNECTED && attempts < 10) {
+    delay(300);
     digitalWrite(PIN_ONBOARD_LED, !digitalRead(PIN_ONBOARD_LED));
     attempts++;
   }
@@ -231,6 +231,7 @@ void setup() {
   applySignal("GREEN");
 
   // 6. Register Web Server Endpoints
+  server.enableCORS(true);
   server.on("/", handleRoot);
   server.on("/set", handleSet);
   server.on("/red", handleRed);
@@ -248,7 +249,7 @@ void setup() {
 void loop() {
   server.handleClient();
 
-  // Emergency Siren Flashing (Red & Green/Yellow alternating rapidly)
+  // Emergency Siren Flashing (Red & Green alternating rapidly)
   if (sirenActive) {
     unsigned long currentMillis = millis();
     if (currentMillis - lastSirenToggle >= 150) {
