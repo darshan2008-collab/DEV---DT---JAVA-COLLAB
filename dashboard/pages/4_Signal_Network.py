@@ -42,14 +42,30 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Top Status Metrics Bar
+# Top Status Metrics Bar & ESP32 Live Auto-Probe
+esp32_ip = st.session_state.get("esp_ip_addr", "192.168.4.1")
+
+# Fast non-blocking background connection probe
+esp_connected = False
+try:
+    import requests
+    _r = requests.get(f"http://{esp32_ip}/status", timeout=0.6)
+    if _r.status_code == 200:
+        esp_connected = True
+        st.session_state["esp_connected"] = True
+except Exception:
+    esp_connected = st.session_state.get("esp_connected", False)
+
 s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
     st.markdown(render_metric_card("Corridor Node", "Junction J2", "Central Boulevard Monitored", "primary"), unsafe_allow_html=True)
 with s2:
     st.markdown(render_metric_card("Active Priority", "North-South", "Ambulance Wave Active", "danger"), unsafe_allow_html=True)
 with s3:
-    st.markdown(render_metric_card("ESP32 Controller", "Online (Node J2)", "MQTT 1883 | Ping: 11.4ms", "success"), unsafe_allow_html=True)
+    if esp_connected:
+        st.markdown(render_metric_card("ESP32 Controller", "CONNECTED", f"IP: {esp32_ip} | Online", "success"), unsafe_allow_html=True)
+    else:
+        st.markdown(render_metric_card("ESP32 Controller", "DISCONNECTED", "Awaiting Hardware Ping", "warning"), unsafe_allow_html=True)
 with s4:
     st.markdown(render_metric_card("Safety Invariant", "100% Enforced", "Yellow 3s + All-Red 2s Hold", "success"), unsafe_allow_html=True)
 with s5:
@@ -66,13 +82,14 @@ with st.container(border=True):
     
     with col_conn1:
         st.markdown("#### Hardware Integration: Connect ESP32 via IP")
-        esp32_ip = st.text_input(
+        esp32_ip_input = st.text_input(
             "Enter your ESP32 Wi-Fi IP Address:",
-            value=st.session_state.get("esp_ip_addr", "192.168.1.15"),
+            value=esp32_ip,
             key="input_esp_ip_addr",
-            help="Check the IP address shown on your 16x2 LCD or Arduino Serial Monitor"
+            help="Check the IP address shown on your OLED Display or Arduino Serial Monitor (Default: 192.168.4.1)"
         )
-        st.session_state["esp_ip_addr"] = esp32_ip
+        st.session_state["esp_ip_addr"] = esp32_ip_input
+        esp32_ip = esp32_ip_input
         
     with col_conn2:
         st.write("")
@@ -81,10 +98,23 @@ with st.container(border=True):
         if ping_btn:
             import requests
             try:
-                r = requests.get(f"http://{esp32_ip}/", timeout=1.5)
-                st.success(f"Connected to ESP32 at {esp32_ip} (HTTP 200 OK)")
+                r = requests.get(f"http://{esp32_ip}/status", timeout=1.5)
+                if r.status_code == 200:
+                    st.session_state["esp_connected"] = True
+                    esp_connected = True
+                    st.success(f"Connected to ESP32 at {esp32_ip} (HTTP 200 OK)")
+                else:
+                    st.session_state["esp_connected"] = False
+                    st.warning(f"ESP32 returned HTTP {r.status_code}")
             except Exception as e:
-                st.warning(f"Awaiting connection at http://{esp32_ip} (Ensure ESP32 is powered ON)")
+                st.session_state["esp_connected"] = False
+                st.warning(f"Could not connect to http://{esp32_ip} (Ensure ESP32 is powered ON)")
+
+    # Prominent Dynamic Connection Status Banner
+    if st.session_state.get("esp_connected", False):
+        st.success(f"**ESP32 HARDWARE CONNECTED** — Node J2 Online at `http://{esp32_ip}` (OLED Display & 4-Pin RGB Ready)")
+    else:
+        st.warning(f"**ESP32 DISCONNECTED** — Please connect your PC/Phone to Wi-Fi **ESP32-AMBULANCE-SIGNAL** (IP: `192.168.4.1`) or check power.")
 
     st.markdown("---")
     st.markdown("#### Direct Physical RGB Light Switcher")
@@ -94,12 +124,24 @@ with st.container(border=True):
     
     import requests
     def trigger_esp(target_ip, color_code):
+        color_lower = color_code.lower()
+        # 1. Try direct REST endpoint (/red, /green, /yellow, /blue, /siren, /off)
+        try:
+            url = f"http://{target_ip}/{color_lower}"
+            r = requests.get(url, timeout=1.5)
+            if r.status_code in [200, 303]:
+                return True, f"Hardware {color_code} Active"
+        except Exception:
+            pass
+        # 2. Fallback to /set?color=...
         try:
             url = f"http://{target_ip}/set?color={color_code}"
-            requests.get(url, timeout=1.5)
-            return True, f"Hardware {color_code} Active"
+            r = requests.get(url, timeout=1.5)
+            if r.status_code == 200:
+                return True, f"Hardware {color_code} Active"
         except Exception as e:
-            return False, f"Could not reach {target_ip}"
+            return False, f"Could not reach http://{target_ip}"
+        return False, f"Could not reach http://{target_ip}"
 
     with col_b1:
         if st.button("RED Signal (Stop)", use_container_width=True, type="secondary"):
@@ -121,7 +163,7 @@ with st.container(border=True):
 
     with col_b4:
         if st.button("BLUE Light", use_container_width=True):
-            ok, m = trigger_esp(esp32_ip, "SIREN")
+            ok, m = trigger_esp(esp32_ip, "BLUE")
             if ok: st.info("BLUE ON")
             else: st.warning(m)
 
@@ -136,6 +178,17 @@ with st.container(border=True):
             ok, m = trigger_esp(esp32_ip, "OFF")
             if ok: st.info("LED OFF")
             else: st.warning(m)
+
+    # Helper for Common Cathode vs Common Anode polarity
+    st.caption("Common Cathode (GND) vs Common Anode (3.3V) hardware polarity switcher:")
+    col_t1, col_t2 = st.columns([5, 7])
+    with col_t1:
+        if st.button("Switch LED Mode (Cathode ↔ Anode)", use_container_width=True):
+            try:
+                r = requests.get(f"http://{esp32_ip}/toggle_mode", timeout=1.5)
+                st.info("LED polarity mode toggled on ESP32!")
+            except Exception as e:
+                st.warning(f"Could not reach ESP32 at {esp32_ip}")
 
 st.write("")
 

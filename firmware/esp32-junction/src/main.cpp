@@ -10,7 +10,7 @@
 #include <Wire.h>
 #include <U8g2lib.h>
 
-// U8G2 Constructor for 0.96" I2C SSD1306 128x64 OLED (Full Buffer)
+// U8G2 Constructor for 0.96" I2C SSD1306 128x64 OLED (Full Buffer, Fast & Crisp)
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 22, /* data=*/ 21);
 
 // --- Wi-Fi Configuration ---
@@ -26,6 +26,8 @@ const char* AP_PASS  = "12345678";
 #define PIN_BLUE   23
 #define PIN_ONBOARD_LED 2
 
+bool isCommonAnode = false;
+
 WebServer server(80);
 
 String currentColor = "GREEN";
@@ -37,7 +39,6 @@ String staIpStr = "Connecting...";
 void updateOled(String statusText) {
   u8g2.clearBuffer();
 
-  // Top Banner
   u8g2.setDrawColor(1);
   u8g2.drawRBox(0, 0, 128, 14, 2);
   u8g2.setDrawColor(0);
@@ -46,7 +47,6 @@ void updateOled(String statusText) {
 
   u8g2.setDrawColor(1);
 
-  // Line 2: Signal State
   u8g2.setFont(u8g2_font_7x14B_tf);
   if (statusText == "RED") {
     u8g2.drawStr(0, 29, "SIG: [RED] STOP");
@@ -62,45 +62,49 @@ void updateOled(String statusText) {
     u8g2.drawStr(0, 29, "SIG: [OFF]");
   }
 
-  // Divider line
   u8g2.drawHLine(0, 33, 128);
 
-  // Line 3 & 4: Network IP Info
   u8g2.setFont(u8g2_font_5x8_tf);
   u8g2.drawStr(0, 44, "AP IP : 192.168.4.1");
   
   String staLine = "STA IP: " + staIpStr;
   u8g2.drawStr(0, 53, staLine.c_str());
 
-  // Line 5: District
   u8g2.setFont(u8g2_font_4x6_tf);
   u8g2.drawStr(0, 62, "J2 NODE | 100% PREEMPTION ACTIVE");
 
   u8g2.sendBuffer();
 }
 
-void setRGB(int r, int g, int b) {
-  analogWrite(PIN_RED,   r);
-  analogWrite(PIN_GREEN, g);
-  analogWrite(PIN_BLUE,  b);
+void setRGB(bool r, bool g, bool b) {
+  if (isCommonAnode) {
+    digitalWrite(PIN_RED,   r ? LOW : HIGH);
+    digitalWrite(PIN_GREEN, g ? LOW : HIGH);
+    digitalWrite(PIN_BLUE,  b ? LOW : HIGH);
+  } else {
+    digitalWrite(PIN_RED,   r ? HIGH : LOW);
+    digitalWrite(PIN_GREEN, g ? HIGH : LOW);
+    digitalWrite(PIN_BLUE,  b ? HIGH : LOW);
+  }
 }
 
 void applyColor(String color) {
+  color.toUpperCase();
   sirenActive = false;
   currentColor = color;
   
   if (color == "RED") {
-    setRGB(255, 0, 0);
+    setRGB(true, false, false);
   } else if (color == "YELLOW") {
-    setRGB(255, 120, 0);
+    setRGB(true, true, false);
   } else if (color == "GREEN") {
-    setRGB(0, 255, 0);
+    setRGB(false, true, false);
   } else if (color == "BLUE") {
-    setRGB(0, 0, 255);
+    setRGB(false, false, true);
   } else if (color == "SIREN") {
     sirenActive = true;
   } else {
-    setRGB(0, 0, 0);
+    setRGB(false, false, false);
     currentColor = "OFF";
   }
 
@@ -112,62 +116,53 @@ void handleRoot() {
   html += "<title>ESP32 Ambulance Signal Head</title>";
   html += "<style>body{font-family:sans-serif; text-align:center; background:#0F172A; color:#F8FAFC; padding:20px;}";
   html += "h1{color:#38BDF8; font-size:22px;}";
-  html += ".btn{display:block; width:85%; max-width:320px; margin:12px auto; padding:15px; font-size:18px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white;}";
+  html += ".btn{display:block; width:85%; max-width:320px; margin:10px auto; padding:14px; font-size:16px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white;}";
   html += ".btn-red{background:#EF4444;} .btn-yellow{background:#F59E0B; color:black;} .btn-green{background:#10B981;} .btn-blue{background:#0284C7;} .btn-siren{background:#EC4899;} .btn-off{background:#475569;}";
-  html += ".status{margin:20px auto; padding:14px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
+  html += ".status{margin:16px auto; padding:12px; background:#1E293B; border-radius:8px; width:85%; max-width:320px; border:1px solid #334155;}";
+  html += ".toggle-box{margin:10px auto; padding:8px; font-size:12px; color:#94A3B8;}";
   html += "</style></head><body>";
   html += "<h1>ESP32 Signal & OLED Controller</h1>";
-  html += "<div class='status'>Active Status: <strong style='color:#38BDF8;'>" + currentColor + "</strong><br>";
-  html += "<small style='color:#94A3B8;'>OLED: SSD1306 I2C (U8G2) Online</small></div>";
+  html += "<div class='status'>Active Light: <strong style='color:#38BDF8;'>" + currentColor + "</strong><br>";
+  html += "<small style='color:#94A3B8;'>LED Mode: " + String(isCommonAnode ? "Common Anode (3.3V)" : "Common Cathode (GND)") + "</small></div>";
   html += "<a class='btn btn-red' href='/red'>RED LIGHT (STOP)</a>";
   html += "<a class='btn btn-yellow' href='/yellow'>YELLOW LIGHT (PREEMPT)</a>";
   html += "<a class='btn btn-green' href='/green'>GREEN LIGHT (CLEAR)</a>";
   html += "<a class='btn btn-blue' href='/blue'>BLUE LIGHT</a>";
   html += "<a class='btn btn-siren' href='/siren'>AMBULANCE SIREN FLASH</a>";
   html += "<a class='btn btn-off' href='/off'>TURN OFF ALL LIGHTS</a>";
-  html += "<p style='font-size:12px; color:#94A3B8; margin-top:25px;'>Karur Medical District | Preemption Node</p>";
+  html += "<div class='toggle-box'><a style='color:#38BDF8;' href='/toggle_mode'>Switch LED Mode (Cathode/Anode)</a></div>";
+  html += "<p style='font-size:12px; color:#94A3B8; margin-top:20px;'>Karur Medical District | Preemption Node</p>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }
 
-void handleRed() {
-  applyColor("RED");
-  server.sendHeader("Location", "/");
-  server.send(303);
+void handleSet() {
+  if (server.hasArg("color")) {
+    String c = server.arg("color");
+    applyColor(c);
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.send(200, "text/plain", "OK: " + currentColor);
+  } else {
+    server.send(400, "text/plain", "Missing color parameter");
+  }
 }
 
-void handleYellow() {
-  applyColor("YELLOW");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
+void handleRed()    { applyColor("RED");    server.sendHeader("Location", "/"); server.send(303); }
+void handleYellow() { applyColor("YELLOW"); server.sendHeader("Location", "/"); server.send(303); }
+void handleGreen()  { applyColor("GREEN");  server.sendHeader("Location", "/"); server.send(303); }
+void handleBlue()   { applyColor("BLUE");   server.sendHeader("Location", "/"); server.send(303); }
+void handleSiren()  { applyColor("SIREN");  server.sendHeader("Location", "/"); server.send(303); }
+void handleOff()    { applyColor("OFF");    server.sendHeader("Location", "/"); server.send(303); }
 
-void handleGreen() {
-  applyColor("GREEN");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-
-void handleBlue() {
-  applyColor("BLUE");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-
-void handleSiren() {
-  applyColor("SIREN");
-  server.sendHeader("Location", "/");
-  server.send(303);
-}
-
-void handleOff() {
-  applyColor("OFF");
+void handleToggleMode() {
+  isCommonAnode = !isCommonAnode;
+  applyColor(currentColor);
   server.sendHeader("Location", "/");
   server.send(303);
 }
 
 void handleStatus() {
-  String json = "{\"status\":\"online\",\"color\":\"" + currentColor + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"display\":\"OLED_U8G2\"}";
+  String json = "{\"status\":\"online\",\"color\":\"" + currentColor + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"led_mode\":\"" + String(isCommonAnode ? "ANODE" : "CATHODE") + "\"}";
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", json);
 }
@@ -191,10 +186,10 @@ void setup() {
   pinMode(PIN_ONBOARD_LED, OUTPUT);
   
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setRGB(255, 0, 0); delay(300);
-  setRGB(0, 255, 0); delay(300);
-  setRGB(0, 0, 255); delay(300);
-  setRGB(0, 0, 0);   delay(200);
+  setRGB(true, false, false); delay(400);
+  setRGB(false, true, false); delay(400);
+  setRGB(false, false, true); delay(400);
+  setRGB(false, false, false);delay(200);
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(AP_SSID, AP_PASS);
@@ -218,12 +213,14 @@ void setup() {
   applyColor("GREEN");
 
   server.on("/", handleRoot);
+  server.on("/set", handleSet);
   server.on("/red", handleRed);
   server.on("/yellow", handleYellow);
   server.on("/green", handleGreen);
   server.on("/blue", handleBlue);
   server.on("/siren", handleSiren);
   server.on("/off", handleOff);
+  server.on("/toggle_mode", handleToggleMode);
   server.on("/status", handleStatus);
 
   server.begin();
@@ -238,9 +235,9 @@ void loop() {
       lastSirenToggle = currentMillis;
       sirenFlip = !sirenFlip;
       if (sirenFlip) {
-        setRGB(255, 0, 0);
+        setRGB(true, false, false);
       } else {
-        setRGB(0, 0, 255);
+        setRGB(false, false, true);
       }
     }
   }
