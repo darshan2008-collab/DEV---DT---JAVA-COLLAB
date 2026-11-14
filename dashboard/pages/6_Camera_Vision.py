@@ -61,10 +61,10 @@ with m4:
 
 st.write("")
 
-# 3 Tab Navigation
+# 3 Main Navigation Tabs
 tab1, tab2, tab3 = st.tabs([
     "📹 Live IP Camera Monitor & AI Detection",
-    "🔌 Connect IP Camera",
+    "🔌 Connect IP Camera (RTSP Link or IP Address)",
     "📊 Object Detection & Human Density Analytics"
 ])
 
@@ -159,58 +159,102 @@ with tab1:
 
 
 # -------------------------------------------------------------
-# TAB 2: CONNECT IP CAMERA (LINK OR IP ADDRESS)
+# TAB 2: CONNECT IP CAMERA (RTSP LINK OR IP ADDRESS)
 # -------------------------------------------------------------
 with tab2:
-    st.subheader("Connect IP / RTSP Camera via Direct Link or IP Address")
+    st.subheader("Connect IP Camera via RTSP Link or IP Address")
     
     st.markdown("""
-    <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; margin-bottom:14px;">
+    <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; margin-bottom:16px;">
         <div style="font-weight:700; color:#0F172A; font-size:1.0rem; margin-bottom:4px;">Dual-Mode Camera Ingestion</div>
-        <div style="font-size:0.84rem; color:#475569;">
-            You can connect your camera using either of the two methods below:<br/>
-            • <b>Method 1: Direct Camera Link (RTSP / HTTP URL)</b> — Paste your full camera stream link directly.<br/>
-            • <b>Method 2: Camera IP Address</b> — Enter only the local IP address (e.g. <code>192.168.1.100</code>) and the system automatically generates the RTSP connection string.
-        </div>
+        <div style="font-size:0.85rem; color:#64748B;">You can connect your camera either directly by pasting its <b>RTSP / HTTP stream link</b>, or by providing its <b>local IP address</b>.</div>
     </div>
     """, unsafe_allow_html=True)
 
-    conn_mode = st.radio(
-        "Choose Connection Method:",
-        [
-            "🔗 Method 1: Connect via Camera Stream Link (Direct RTSP / HTTP URL)",
-            "🌐 Method 2: Connect via Camera IP Address (Auto-Generates RTSP Link)"
-        ],
-        index=0
-    )
+    # Sub-tabs for Link vs IP Address
+    subtab_link, subtab_ip = st.tabs([
+        "🔗 Connect via RTSP / Stream Link (Direct URL)",
+        "🌐 Connect via IP Address & Port (Auto-Builder)"
+    ])
 
-    with st.form("connect_camera_form"):
-        col_id, col_name, col_seg = st.columns([3, 4, 3])
-        with col_id:
-            new_stream_id = st.text_input("Camera ID", value="CAM-IP-01", help="Unique identifier, e.g. CAM-01, CAM-J2")
-        with col_name:
-            new_label = st.text_input("Camera Location / Name", value="Karur Junction 2 Traffic Cam")
-        with col_seg:
-            new_segment = st.text_input("Monitored Road Corridor", value="B2")
+    # ---------------------------------------------------------
+    # METHOD 1: CONNECT VIA DIRECT RTSP LINK
+    # ---------------------------------------------------------
+    with subtab_link:
+        st.markdown("<div style='font-weight:600; color:#0F172A; font-size:0.92rem; margin-bottom:8px;'>Paste Camera Stream Link:</div>", unsafe_allow_html=True)
         
-        final_stream_url = ""
+        with st.form("connect_by_link_form"):
+            col_l1, col_l2, col_l3 = st.columns([3, 4, 3])
+            with col_l1:
+                link_stream_id = st.text_input("Camera ID", value="CAM-RTSP-01", key="link_id", help="Unique ID, e.g. CAM-01, CAM-J2")
+            with col_l2:
+                link_label = st.text_input("Camera Name / Location", value="Karur Junction 2 Traffic Cam", key="link_lbl")
+            with col_l3:
+                link_segment = st.text_input("Monitored Road Corridor", value="B2", key="link_seg")
 
-        if "Method 1" in conn_mode:
-            st.markdown("<div style='font-size:0.85rem; font-weight:600; color:#0284C7; margin:8px 0 4px 0;'>Paste Full Camera RTSP / HTTP Link:</div>", unsafe_allow_html=True)
-            final_stream_url = st.text_input(
-                "Camera Stream Link (RTSP / HTTP URL)",
+            direct_url = st.text_input(
+                "RTSP / HTTP Stream Link",
                 value="rtsp://admin:admin123@192.168.1.100:554/stream1",
-                help="Examples: rtsp://username:password@192.168.1.x:554/stream1, http://192.168.1.x:8080/video, or 0 for local webcam"
+                key="direct_stream_url",
+                help="Enter full RTSP or HTTP URL. Examples: rtsp://username:password@192.168.1.100:554/stream1 or http://192.168.1.50:8080/video"
             )
+
             st.markdown("""
-            <div style="font-size:0.78rem; color:#64748B; margin-top:-6px; margin-bottom:8px;">
-                💡 <b>Supported Stream Protocols:</b> <code>rtsp://</code> (Standard IP Cameras, Hikvision, CP Plus, Dahua) | <code>http://.../video</code> (Smartphone IP Webcam) | <code>0</code> (Laptop Webcam)
+            <div style="font-size:0.78rem; color:#64748B; margin-top:-6px; margin-bottom:12px;">
+                💡 <b>Supported URL Formats:</b><br/>
+                • <b>Generic RTSP:</b> <code>rtsp://username:password@&lt;IP&gt;:554/stream1</code><br/>
+                • <b>Hikvision:</b> <code>rtsp://admin:password@&lt;IP&gt;:554/Streaming/Channels/101</code><br/>
+                • <b>Dahua / CP Plus:</b> <code>rtsp://admin:password@&lt;IP&gt;:554/cam/realmonitor?channel=1&subtype=0</code><br/>
+                • <b>Mobile 'IP Webcam' App:</b> <code>http://&lt;IP&gt;:8080/video</code><br/>
+                • <b>Laptop Webcam:</b> <code>0</code>
             </div>
             """, unsafe_allow_html=True)
 
-        else:
-            st.markdown("<div style='font-size:0.85rem; font-weight:600; color:#0284C7; margin:8px 0 4px 0;'>Enter Camera IP Address & Select Preset:</div>", unsafe_allow_html=True)
-            cam_type = st.selectbox(
+            col_fps, col_force = st.columns([6, 6])
+            with col_fps:
+                link_fps = st.slider("Sampling FPS (Inference Frequency)", min_value=1, max_value=10, value=2, key="link_fps")
+            with col_force:
+                st.write("")
+                st.write("")
+                link_retry = st.checkbox("Auto-queue and retry in background if camera is booting", value=True, key="link_retry")
+
+            btn_submit_link = st.form_submit_button("🚀 Connect via RTSP Camera Link", type="primary", use_container_width=True)
+
+            if btn_submit_link:
+                if not direct_url.strip():
+                    st.error("Please enter a valid RTSP or HTTP link.")
+                else:
+                    with st.spinner(f"Connecting to RTSP stream at {direct_url}..."):
+                        res = connect_camera(
+                            stream_id=link_stream_id.strip(),
+                            rtsp_url=direct_url.strip(),
+                            segment_id=link_segment.strip(),
+                            label=link_label.strip(),
+                            fps_sample=link_fps,
+                            force_register=link_retry
+                        )
+                        if "error" in res and not link_retry:
+                            st.warning(f"Connection Alert: {res['error']}")
+                        else:
+                            st.success(f"🎉 Camera '{link_stream_id}' connected via RTSP link! YOLOv8 and Human Density tracking active.")
+                            st.rerun()
+
+    # ---------------------------------------------------------
+    # METHOD 2: CONNECT VIA IP ADDRESS & PORT
+    # ---------------------------------------------------------
+    with subtab_ip:
+        st.markdown("<div style='font-weight:600; color:#0F172A; font-size:0.92rem; margin-bottom:8px;'>Enter Camera IP Address & Parameters:</div>", unsafe_allow_html=True)
+
+        with st.form("connect_by_ip_form"):
+            col_i1, col_i2, col_i3 = st.columns([3, 4, 3])
+            with col_i1:
+                ip_stream_id = st.text_input("Camera ID", value="CAM-IP-01", key="ip_id")
+            with col_i2:
+                ip_label = st.text_input("Camera Name / Location", value="Karur Junction 2 Traffic Cam", key="ip_lbl")
+            with col_i3:
+                ip_segment = st.text_input("Monitored Road Corridor", value="B2", key="ip_seg")
+
+            cam_preset = st.selectbox(
                 "Camera Protocol / Brand Preset:",
                 [
                     "Generic RTSP IP Camera (Port 554, /stream1)",
@@ -219,66 +263,73 @@ with tab2:
                     "CP Plus / Dahua (Port 554, /cam/realmonitor?channel=1&subtype=0)",
                     "Laptop Built-in Webcam / USB Cam (Device Index 0)"
                 ],
-                index=0
+                index=0,
+                key="ip_preset"
             )
-            
+
             c_ip, c_port = st.columns([7, 3])
             with c_ip:
-                ip_address = st.text_input("Camera IP Address", value="192.168.1.120", help="Example: 192.168.1.120 or 192.168.43.50")
+                camera_ip = st.text_input("Camera IP Address", value="192.168.1.120", key="camera_ip_val", help="Example: 192.168.1.120 or 192.168.43.150")
             with c_port:
-                default_port = "8080" if "IP Webcam" in cam_type else ("0" if "Laptop" in cam_type else "554")
-                port_num = st.text_input("Port", value=default_port)
+                default_port = "8080" if "IP Webcam" in cam_preset else ("0" if "Laptop" in cam_preset else "554")
+                port_val = st.text_input("Port", value=default_port, key="camera_port_val")
 
-            c_user, c_pass = st.columns(2)
-            with c_user:
-                username = st.text_input("Username (Optional)", value="admin" if "Laptop" not in cam_type and "IP Webcam" not in cam_type else "")
-            with c_pass:
-                password = st.text_input("Password (Optional)", value="", type="password")
+            c_u, c_p = st.columns(2)
+            with c_u:
+                user_val = st.text_input("Username (Optional)", value="admin" if "Laptop" not in cam_preset and "IP Webcam" not in cam_preset else "", key="camera_user_val")
+            with c_p:
+                pass_val = st.text_input("Password (Optional)", value="", type="password", key="camera_pass_val")
 
-            # Dynamically construct the stream URL from IP Address
-            if "Laptop" in cam_type:
-                final_stream_url = "0"
-            elif "IP Webcam" in cam_type:
-                auth_str = f"{username}:{password}@" if username and password else ""
-                final_stream_url = f"http://{auth_str}{ip_address.strip()}:{port_num.strip()}/video"
-            elif "Hikvision" in cam_type:
-                auth_str = f"{username}:{password}@" if username and password else ""
-                final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/Streaming/Channels/101"
-            elif "CP Plus" in cam_type or "Dahua" in cam_type:
-                auth_str = f"{username}:{password}@" if username and password else ""
-                final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/cam/realmonitor?channel=1&subtype=0"
-            else: # Generic RTSP
-                auth_str = f"{username}:{password}@" if username and password else ""
-                final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/stream1"
+            # Dynamically assemble the URL
+            if "Laptop" in cam_preset:
+                assembled_url = "0"
+            elif "IP Webcam" in cam_preset:
+                auth_prefix = f"{user_val}:{pass_val}@" if user_val and pass_val else ""
+                assembled_url = f"http://{auth_prefix}{camera_ip.strip()}:{port_val.strip()}/video"
+            elif "Hikvision" in cam_preset:
+                auth_prefix = f"{user_val}:{pass_val}@" if user_val and pass_val else ""
+                assembled_url = f"rtsp://{auth_prefix}{camera_ip.strip()}:{port_val.strip()}/Streaming/Channels/101"
+            elif "CP Plus" in cam_preset or "Dahua" in cam_preset:
+                auth_prefix = f"{user_val}:{pass_val}@" if user_val and pass_val else ""
+                assembled_url = f"rtsp://{auth_prefix}{camera_ip.strip()}:{port_val.strip()}/cam/realmonitor?channel=1&subtype=0"
+            else:  # Generic RTSP
+                auth_prefix = f"{user_val}:{pass_val}@" if user_val and pass_val else ""
+                assembled_url = f"rtsp://{auth_prefix}{camera_ip.strip()}:{port_val.strip()}/stream1"
 
             st.markdown(f"""
-            <div style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; font-size:0.80rem; margin:8px 0;">
-                <b>Compiled Stream Link:</b> <code style="color:#0284C7;">{final_stream_url}</code>
+            <div style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; font-size:0.80rem; margin:8px 0 12px 0;">
+                <b>Generated Stream URL:</b> <code style="color:#0284C7;">{assembled_url}</code>
             </div>
             """, unsafe_allow_html=True)
 
-        fps_slider = st.slider("Sampling FPS (Frames per second to analyze)", min_value=1, max_value=10, value=2)
-        
-        submit_btn = st.form_submit_button("🚀 Connect Camera & Start AI Processing", type="primary", use_container_width=True)
-        
-        if submit_btn:
-            if not final_stream_url.strip():
-                st.error("Please enter a valid camera link or IP address.")
-            else:
-                with st.spinner(f"Connecting to camera at {final_stream_url}..."):
-                    res = connect_camera(
-                        stream_id=new_stream_id.strip(),
-                        rtsp_url=final_stream_url.strip(),
-                        segment_id=new_segment.strip(),
-                        label=new_label.strip(),
-                        fps_sample=fps_slider
-                    )
-                    if "error" in res:
-                        st.warning(f"Connection Alert: {res['error']}\n\nRegistered in queue. Ensure the camera device is powered and reachable on your Wi-Fi network.")
-                    else:
-                        st.success(f"🎉 Camera '{new_stream_id}' successfully connected! Live YOLOv8 object detection and crowd tracking active!")
-                        st.rerun()
-                        st.rerun()
+            col_fps2, col_force2 = st.columns([6, 6])
+            with col_fps2:
+                ip_fps = st.slider("Sampling FPS (Inference Frequency)", min_value=1, max_value=10, value=2, key="ip_fps_slider")
+            with col_force2:
+                st.write("")
+                st.write("")
+                ip_retry = st.checkbox("Auto-queue and retry in background if camera is booting", value=True, key="ip_retry")
+
+            btn_submit_ip = st.form_submit_button("🚀 Connect via IP Address", type="primary", use_container_width=True)
+
+            if btn_submit_ip:
+                if not assembled_url.strip():
+                    st.error("Please enter a valid IP address.")
+                else:
+                    with st.spinner(f"Connecting to camera at {assembled_url}..."):
+                        res = connect_camera(
+                            stream_id=ip_stream_id.strip(),
+                            rtsp_url=assembled_url.strip(),
+                            segment_id=ip_segment.strip(),
+                            label=ip_label.strip(),
+                            fps_sample=ip_fps,
+                            force_register=ip_retry
+                        )
+                        if "error" in res and not ip_retry:
+                            st.warning(f"Connection Alert: {res['error']}")
+                        else:
+                            st.success(f"🎉 Camera '{ip_stream_id}' connected via IP Address! YOLOv8 and Human Density tracking active.")
+                            st.rerun()
 
 
 # -------------------------------------------------------------

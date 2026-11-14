@@ -267,11 +267,17 @@ def test_camera_vision(stream_id: str, rtsp_url: str, segment_id: str,
 
 def connect_camera(stream_id: str, rtsp_url: str, segment_id: str,
                    label: str = "", fps_sample: int = 2,
-                   location_lat: float = None, location_lng: float = None):
+                   location_lat: float = None, location_lng: float = None,
+                   force_register: bool = False):
     """Verify, persist, and start one IP camera as a single dashboard action."""
-    probe = test_camera_vision(stream_id, rtsp_url, segment_id, label, fps_sample)
-    if probe.get("status") != "READY":
-        return {"error": probe.get("detail", probe.get("error", "Camera connection failed."))}
+    if not force_register:
+        probe = test_camera_vision(stream_id, rtsp_url, segment_id, label, fps_sample)
+        if probe.get("status") != "READY":
+            # Return probe error with flag indicating it can be queued
+            return {
+                "error": probe.get("detail", probe.get("error", "Camera connection failed.")),
+                "can_retry": True
+            }
 
     backend = register_camera_backend(
         stream_id, rtsp_url, segment_id, label, fps_sample, location_lat, location_lng
