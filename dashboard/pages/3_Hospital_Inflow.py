@@ -267,11 +267,11 @@ st.divider()
 # ============================================================================
 # KARUR DISTRICT HEALTHCARE GIS & HOSPITAL DIRECTORY MAP
 # ============================================================================
-st.subheader("Karur District Healthcare Facilities & Emergency GIS Map (கரூர் மாவட்ட மருத்துவ வரைபடம்)")
+st.subheader("Karur District Healthcare Facilities & Emergency GIS Map")
 st.markdown(
     "<div style='font-size:0.9rem; color:#475569; margin-bottom:12px;'>"
-    "📍 <b>கரூர் மாவட்டம் எல்லைக்குள் உள்ள மருத்துவமனைகள் & கிளினிக்குகள் மட்டும் (Exclusively Karur District).</b> "
-    "Highlighted with 🔴 Govt Medical College/Hospitals, 🔵 Private Multispeciality, 🟢 Primary Health Centres (PHC), and 🟣 Speciality Clinics."
+    "📍 <b>Exclusively Karur District Healthcare Infrastructure.</b> "
+    "Demarcated with 🔴 Govt Medical College/Hospitals, 🔵 Private Multispeciality, 🟢 Primary Health Centres (PHC), and 🟣 Speciality Clinics."
     "</div>",
     unsafe_allow_html=True
 )
@@ -279,8 +279,8 @@ st.markdown(
 c_filter1, c_filter2 = st.columns([4, 6])
 with c_filter1:
     hosp_type_selected = st.selectbox(
-        "Filter Facility Category (வகைப்பாடு):",
-        ["All Karur Facilities (அனைத்தும்)", "Govt Medical College", "Govt Hospital", "Private Multispeciality", "Clinic & Nursing Home", "Primary Health Centre (PHC/UPHC)"],
+        "Filter Facility Category:",
+        ["All Karur Facilities", "Govt Medical College", "Govt Hospital", "Private Multispeciality", "Clinic & Nursing Home", "Primary Health Centre (PHC/UPHC)"],
         index=0,
         key="inflow_hosp_filter"
     )
@@ -317,7 +317,6 @@ with st.expander("📋 View Complete Karur District Healthcare Directory (20 Fac
     hosp_df = pd.DataFrame([
         {
             "Facility Name": h["name"],
-            "Tamil Name (தமிழ் பெயர்)": h["tamil_name"],
             "Category": h["category"],
             "Beds": h["beds"],
             "ICU Beds": h["icu_beds"],

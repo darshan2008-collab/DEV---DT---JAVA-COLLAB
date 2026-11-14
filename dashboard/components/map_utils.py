@@ -14,7 +14,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "GMCH-01",
         "name": "Govt Medical College Hospital (GMCH) Karur",
-        "tamil_name": "கரூர் அரசு மருத்துவக் கல்லூரி மருத்துவமனை",
         "category": "Govt Medical College",
         "coords": [10.9332, 78.0841],
         "type": "Apex Level-1 Trauma & Tertiary Care (750+ Beds)",
@@ -32,7 +31,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "KGH-02",
         "name": "Karur Govt District Headquarters Hospital (Old GH)",
-        "tamil_name": "கரூர் அரசு தலைமை மருத்துவமனை (பழைய GH)",
         "category": "Govt Hospital",
         "coords": [10.9605, 78.0772],
         "type": "Government General & Emergency Hospital",
@@ -50,7 +48,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "AMR-03",
         "name": "Amaravathi Hospital",
-        "tamil_name": "அமராவதி மருத்துவமனை",
         "category": "Private Multispeciality",
         "coords": [10.9602, 78.0685],
         "type": "24x7 Multispeciality & Trauma Care",
@@ -68,7 +65,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "APL-04",
         "name": "Apollo Speciality Clinics / Apollo Loga Hospital",
-        "tamil_name": "அப்பல்லோ சிறப்பு மருத்துவமனை",
         "category": "Private Multispeciality",
         "coords": [10.9601, 78.0675],
         "type": "Super Speciality & Cardiac Care",
@@ -86,7 +82,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "KVY-05",
         "name": "Kauvery Medical Centre / Sri Kavery Hospital",
-        "tamil_name": "ஸ்ரீ காவேரி மருத்துவமனை",
         "category": "Private Multispeciality",
         "coords": [10.9585, 78.0732],
         "type": "Comprehensive Emergency & Ortho Hospital",
@@ -104,7 +99,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "KGH-06",
         "name": "K.G. Hospital & Trauma Centre",
-        "tamil_name": "கே.ஜி. மருத்துவமனை & தீவிர சிகிச்சை மையம்",
         "category": "Private Multispeciality",
         "coords": [10.9575, 78.0815],
         "type": "Trauma & Surgical Care",
@@ -122,7 +116,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "SAR-07",
         "name": "Saraswathi Hospital",
-        "tamil_name": "சரஸ்வதி மருத்துவமனை",
         "category": "Private Multispeciality",
         "coords": [10.9560, 78.0765],
         "type": "Multispeciality Hospital",
@@ -140,7 +133,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "ABI-08",
         "name": "Abirami Hospital",
-        "tamil_name": "அபிராமி மருத்துவமனை",
         "category": "Private Multispeciality",
         "coords": [10.9592, 78.0788],
         "type": "Maternity & Surgical Care",
@@ -158,7 +150,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "ATL-09",
         "name": "Atlas Hospital",
-        "tamil_name": "அட்லஸ் மருத்துவமனை",
         "category": "Private Multispeciality",
         "coords": [10.9598, 78.0712],
         "type": "Critical Care & Neuro Hospital",
@@ -176,7 +167,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "ARV-10",
         "name": "Aravind Eye Hospital",
-        "tamil_name": "அரவிந்த் கண் மருத்துவமனை",
         "category": "Speciality Clinic",
         "coords": [10.9620, 78.0710],
         "type": "Apex Ophthalmology Center",
@@ -194,7 +184,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "DPK-11",
         "name": "Deepa Kannan Hospital & Clinic",
-        "tamil_name": "தீபா கண்ணன் கிளினிக் & குழந்தைகள் மையம்",
         "category": "Clinic & Nursing Home",
         "coords": [10.9540, 78.0720],
         "type": "Pediatric & Family Healthcare Clinic",
@@ -212,7 +201,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "MNK-12",
         "name": "Meenakshi Multispeciality Clinic",
-        "tamil_name": "மீனாட்சி கிளினிக்",
         "category": "Clinic & Nursing Home",
         "coords": [10.9615, 78.0810],
         "type": "Outpatient & Urgent Care Clinic",
@@ -231,7 +219,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "KUL-13",
         "name": "Kulithalai Govt Headquarters Hospital",
-        "tamil_name": "குளித்தலை அரசு தலைமை மருத்துவமனை",
         "category": "Govt Hospital",
         "coords": [10.9318, 78.4180],
         "type": "Sub-District Hospital (East Karur Corridor)",
@@ -249,7 +236,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "ARV-14",
         "name": "Aravakurichi Government Hospital",
-        "tamil_name": "அரவக்குறிச்சி அரசு மருத்துவமனை",
         "category": "Govt Hospital",
         "coords": [10.7710, 77.9090],
         "type": "Taluk Hospital (South-West Karur Corridor)",
@@ -267,7 +253,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "PGL-15",
         "name": "Velayuthampalayam / Pugalur Govt Hospital",
-        "tamil_name": "புகழூர் / வேலாயுதம்பாளையம் அரசு மருத்துவமனை",
         "category": "Govt Hospital",
         "coords": [11.0720, 78.0120],
         "type": "Taluk Hospital (North Karur Corridor / TNPL)",
@@ -285,7 +270,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "KRP-16",
         "name": "Krishnarayapuram Government Hospital",
-        "tamil_name": "கிருஷ்ணராயபுரம் அரசு மருத்துவமனை",
         "category": "Govt Hospital",
         "coords": [10.9330, 78.2750],
         "type": "Taluk Hospital (Cauvery Basin Corridor)",
@@ -304,7 +288,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "PHC-17",
         "name": "Thanthonimalai Urban PHC (UPHC)",
-        "tamil_name": "தாந்தோணிமலை நகர்ப்புற ஆரம்ப சுகாதார நிலையம்",
         "category": "Primary Health Centre (PHC/UPHC)",
         "coords": [10.9250, 78.0850],
         "type": "Urban Primary Health Centre",
@@ -322,7 +305,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "PHC-18",
         "name": "Inamkarur Urban PHC",
-        "tamil_name": "இனம்கரூர் நகர்ப்புற ஆரம்ப சுகாதார நிலையம்",
         "category": "Primary Health Centre (PHC/UPHC)",
         "coords": [10.9750, 78.0820],
         "type": "Urban Primary Health Centre",
@@ -340,7 +322,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "PHC-19",
         "name": "Manmangalam Primary Health Centre",
-        "tamil_name": "மண்மங்கலம் ஆரம்ப சுகாதார நிலையம்",
         "category": "Primary Health Centre (PHC/UPHC)",
         "coords": [11.0200, 78.0700],
         "type": "Rural Primary Health Centre",
@@ -358,7 +339,6 @@ KARUR_DISTRICT_HOSPITALS = [
     {
         "id": "PHC-20",
         "name": "Uppidamangalam Primary Health Centre",
-        "tamil_name": "உப்பிடமங்கலம் ஆரம்ப சுகாதார நிலையம்",
         "category": "Primary Health Centre (PHC/UPHC)",
         "coords": [10.9200, 78.1800],
         "type": "Block Primary Health Centre",
@@ -442,7 +422,7 @@ def create_network_map(
         control_scale=True,
     )
 
-    # 1. Demarcate Karur District Boundary (கரூர் மாவட்டம்)
+    # 1. Demarcate Karur District Boundary 
     folium.Polygon(
         locations=KARUR_DISTRICT_BORDER,
         color="#0284C7",
@@ -452,7 +432,7 @@ def create_network_map(
         fill_color="#38BDF8",
         fill_opacity=0.04,
         dash_array="6, 8",
-        popup="<b>KARUR DISTRICT BOUNDARY (கரூர் மாவட்டம்)</b><br>Active Medical & Ambulance Priority Zone",
+        popup="<b>KARUR DISTRICT BOUNDARY </b><br>Active Medical & Ambulance Priority Zone",
         tooltip="Karur District Boundary"
     ).add_to(m)
 
@@ -465,7 +445,7 @@ def create_network_map(
             seg_congestion[sid] = t.get("congestion_level", "LOW")
             seg_speeds[sid] = t.get("speed_kmph", 40.0)
 
-    for seg_id, path in SEGMENT_PATHS.items():
+    for seg_id, path in SEGMENT_PATHS.items:
         cong = seg_congestion.get(seg_id, "LOW")
         speed = seg_speeds.get(seg_id, 40.0)
         color = CONGESTION_COLORS.get(cong, "#2ECC71")
@@ -492,7 +472,7 @@ def create_network_map(
         ).add_to(m)
 
     # 3. Draw Corridor Junctions (S, J1, J2, J3)
-    for jid, coords in JUNCTION_COORDS.items():
+    for jid, coords in JUNCTION_COORDS.items:
         if jid == "S":
             folium.Marker(
                 coords,
@@ -531,7 +511,6 @@ def create_network_map(
                 </div>
                 <div style='padding:10px; border:1px solid #E2E8F0; border-top:none; border-radius:0 0 6px 6px; background:#FFFFFF;'>
                     <h4 style='margin:0 0 4px 0; color:#0F172A; font-size:14px;'>{hosp['name']}</h4>
-                    <div style='color:#64748B; font-size:11px; margin-bottom:8px; font-weight:600;'>{hosp['tamil_name']}</div>
                     
                     <div style='font-size:11px; color:#334155; margin-bottom:6px;'>
                         <b>Address:</b> {hosp['address']}
@@ -567,7 +546,6 @@ def create_network_map(
                     fill_color="#F87171",
                     fill_opacity=0.35,
                     popup=folium.Popup(popup_html, max_width=300),
-                    tooltip=f"APEX: {hosp['name']} ({hosp['tamil_name']})"
                 ).add_to(m)
 
             folium.Marker(

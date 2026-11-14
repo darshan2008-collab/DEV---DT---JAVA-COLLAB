@@ -64,7 +64,7 @@ st.write("")
 # 3 Tab Navigation
 tab1, tab2, tab3 = st.tabs([
     "📹 Live IP Camera Monitor & AI Detection",
-    "🔌 Connect IP Camera (IP முகவரி மூலம் இணைப்பு)",
+    "🔌 Connect IP Camera",
     "📊 Object Detection & Human Density Analytics"
 ])
 
@@ -113,21 +113,21 @@ with tab1:
     density_lvl = metrics.get("human_density_level", "MODERATE")
 
     # Real-time Multi-Class Object Telemetry Grid
-    st.markdown("<div style='font-weight:700; color:#0F172A; margin:8px 0 6px 0; font-size:0.95rem;'>🎯 Real-Time Detected Objects (கண்டறியப்பட்ட வாகனங்கள் & மனிதர்கள்):</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-weight:700; color:#0F172A; margin:8px 0 6px 0; font-size:0.95rem;'>🎯 Real-Time Detected Objects:</div>", unsafe_allow_html=True)
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        st.markdown(render_metric_card("🚗 Cars (கார்)", f"{cars} Units", "Green BBox", "success"), unsafe_allow_html=True)
+        st.markdown(render_metric_card("🚗 Cars", f"{cars} Units", "Green BBox", "success"), unsafe_allow_html=True)
     with c2:
-        st.markdown(render_metric_card("🚌 Buses (பஸ்)", f"{buses} Units", "Amber BBox", "warning"), unsafe_allow_html=True)
+        st.markdown(render_metric_card("🚌 Buses", f"{buses} Units", "Amber BBox", "warning"), unsafe_allow_html=True)
     with c3:
-        st.markdown(render_metric_card("🚴 Cycles (சைக்கிள்)", f"{cycles} Units", "Cyan BBox", "primary"), unsafe_allow_html=True)
+        st.markdown(render_metric_card("🚴 Cycles", f"{cycles} Units", "Cyan BBox", "primary"), unsafe_allow_html=True)
     with c4:
-        st.markdown(render_metric_card("🏍️ Bikes (பைக்)", f"{bikes} Units", "Yellow BBox", "warning"), unsafe_allow_html=True)
+        st.markdown(render_metric_card("🏍️ Bikes", f"{bikes} Units", "Yellow BBox", "warning"), unsafe_allow_html=True)
     with c5:
-        st.markdown(render_metric_card("🚚 Trucks (லாரி)", f"{trucks} Units", "Purple BBox", "neutral"), unsafe_allow_html=True)
+        st.markdown(render_metric_card("🚚 Trucks", f"{trucks} Units", "Purple BBox", "neutral"), unsafe_allow_html=True)
     with c6:
         crowd_color = "success" if density_lvl == "LOW" else ("warning" if density_lvl == "MODERATE" else "danger")
-        st.markdown(render_metric_card("🚶 Pedestrians (மனிதர்கள்)", f"{humans} Persons", f"Density: {density_lvl}", crowd_color), unsafe_allow_html=True)
+        st.markdown(render_metric_card("🚶 Pedestrians", f"{humans} Persons", f"Density: {density_lvl}", crowd_color), unsafe_allow_html=True)
 
     # Human Density & Traffic Signal Preemption Action Bar
     if density_lvl in ["CROWDED", "HIGH"]:
@@ -159,160 +159,129 @@ with tab1:
 
 
 # -------------------------------------------------------------
-# TAB 2: CONNECT IP CAMERA & DIRECT IP BUILDER
+# TAB 2: CONNECT IP CAMERA
 # -------------------------------------------------------------
 with tab2:
-    st.subheader("Connect Physical IP / RTSP Camera via Wi-Fi (நேரடி IP முகவரி மூலம் இணைப்பு)")
+    st.subheader("Connect Physical IP / RTSP Camera via Wi-Fi")
     
-    col_reg, col_guide = st.columns([7, 5])
-    
-    with col_reg:
-        st.markdown("""
-        <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; margin-bottom:14px;">
-            <div style="font-weight:700; color:#0F172A; font-size:1.0rem; margin-bottom:4px;">IP Camera Connection Wizard</div>
-            <div style="font-size:0.82rem; color:#64748B;">உங்கள் வைஃபை ரவுட்டரில் உள்ள IP கேமராவின் IP முகவரியை (IP Address) கீழே உள்ளிட்டு நேரடியாக இணையுங்கள்.</div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; margin-bottom:14px;">
+        <div style="font-weight:700; color:#0F172A; font-size:1.0rem; margin-bottom:4px;">IP Camera Connection Wizard</div>
+        <div style="font-size:0.82rem; color:#64748B;">Enter the IP address of your network camera or mobile IP camera app to establish a real-time RTSP/HTTP stream.</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-        conn_mode = st.radio(
-            "Connection Method (இணைப்பு முறை):",
-            ["⚡ Easy IP Address Builder (IP முகவரி மட்டும் உள்ளிடவும் - பரிந்துரைக்கப்படுகிறது)", "🔗 Full RTSP / HTTP URL (முழுமையான ஸ்ட்ரீம் URL)"],
-            index=0
-        )
+    conn_mode = st.radio(
+        "Connection Mode:",
+        ["⚡ Direct IP Address Configuration (Recommended)", "🔗 Full RTSP / HTTP Stream URL"],
+        index=0
+    )
 
-        with st.form("connect_camera_form"):
+    with st.form("connect_camera_form"):
+        col_id, col_name, col_seg = st.columns([3, 4, 3])
+        with col_id:
             new_stream_id = st.text_input("Camera ID", value="CAM-IP-01", help="Unique identifier, e.g. CAM-01, CAM-J2")
-            new_label = st.text_input("Camera Name / Location (அமைவிடம்)", value="Karur Junction 2 Traffic Cam")
-            new_segment = st.text_input("Monitored Road Segment (சாலை காரிடார்)", value="B2")
+        with col_name:
+            new_label = st.text_input("Camera Location / Name", value="Karur Junction 2 Traffic Cam")
+        with col_seg:
+            new_segment = st.text_input("Monitored Road Corridor", value="B2")
+        
+        final_stream_url = ""
+
+        if "Direct IP Address" in conn_mode:
+            st.markdown("<div style='font-size:0.85rem; font-weight:600; color:#0284C7; margin:8px 0 4px 0;'>Camera Network Parameters:</div>", unsafe_allow_html=True)
+            cam_type = st.selectbox(
+                "Camera Protocol / Brand Preset:",
+                [
+                    "Generic RTSP IP Camera (Port 554, /stream1)",
+                    "Mobile Phone 'IP Webcam' App (Port 8080, /video)",
+                    "Hikvision / Ezviz (Port 554, /Streaming/Channels/101)",
+                    "CP Plus / Dahua (Port 554, /cam/realmonitor?channel=1&subtype=0)",
+                    "Laptop Built-in Webcam / USB Cam (Device Index 0)"
+                ],
+                index=0
+            )
             
-            final_stream_url = ""
+            c_ip, c_port = st.columns([7, 3])
+            with c_ip:
+                ip_address = st.text_input("Camera IP Address", value="192.168.1.120", help="Example: 192.168.1.120 or 192.168.43.50")
+            with c_port:
+                default_port = "8080" if "IP Webcam" in cam_type else ("0" if "Laptop" in cam_type else "554")
+                port_num = st.text_input("Port", value=default_port)
 
-            if "Easy IP Address" in conn_mode:
-                st.markdown("<div style='font-size:0.85rem; font-weight:600; color:#0284C7; margin:8px 0 4px 0;'>1. Camera Network Details:</div>", unsafe_allow_html=True)
-                cam_type = st.selectbox(
-                    "Camera Brand / Protocol Preset:",
-                    [
-                        "Generic RTSP IP Camera (Port 554, /stream1)",
-                        "Mobile Phone 'IP Webcam' App (Port 8080, /video)",
-                        "Hikvision / Ezviz (Port 554, /Streaming/Channels/101)",
-                        "CP Plus / Dahua (Port 554, /cam/realmonitor?channel=1&subtype=0)",
-                        "Laptop Built-in Webcam / USB Cam (Device Index 0)"
-                    ],
-                    index=0
-                )
-                
-                c_ip, c_port = st.columns([7, 3])
-                with c_ip:
-                    ip_address = st.text_input("IP Address (கேமரா IP முகவரி)", value="192.168.1.120", help="Example: 192.168.1.120 or 192.168.43.50")
-                with c_port:
-                    default_port = "8080" if "IP Webcam" in cam_type else ("0" if "Laptop" in cam_type else "554")
-                    port_num = st.text_input("Port (போர்ட்)", value=default_port)
+            c_user, c_pass = st.columns(2)
+            with c_user:
+                username = st.text_input("Username (Optional)", value="admin" if "Laptop" not in cam_type and "IP Webcam" not in cam_type else "")
+            with c_pass:
+                password = st.text_input("Password (Optional)", value="", type="password")
 
-                c_user, c_pass = st.columns(2)
-                with c_user:
-                    username = st.text_input("Username (பயனர்பெயர்)", value="admin" if "Laptop" not in cam_type and "IP Webcam" not in cam_type else "")
-                with c_pass:
-                    password = st.text_input("Password (கடவுச்சொல்)", value="", type="password")
+            # Dynamically construct the stream URL
+            if "Laptop" in cam_type:
+                final_stream_url = "0"
+            elif "IP Webcam" in cam_type:
+                auth_str = f"{username}:{password}@" if username and password else ""
+                final_stream_url = f"http://{auth_str}{ip_address.strip()}:{port_num.strip()}/video"
+            elif "Hikvision" in cam_type:
+                auth_str = f"{username}:{password}@" if username and password else ""
+                final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/Streaming/Channels/101"
+            elif "CP Plus" in cam_type or "Dahua" in cam_type:
+                auth_str = f"{username}:{password}@" if username and password else ""
+                final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/cam/realmonitor?channel=1&subtype=0"
+            else: # Generic RTSP
+                auth_str = f"{username}:{password}@" if username and password else ""
+                final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/stream1"
 
-                # Dynamically construct the stream URL
-                if "Laptop" in cam_type:
-                    final_stream_url = "0"
-                elif "IP Webcam" in cam_type:
-                    auth_str = f"{username}:{password}@" if username and password else ""
-                    final_stream_url = f"http://{auth_str}{ip_address.strip()}:{port_num.strip()}/video"
-                elif "Hikvision" in cam_type:
-                    auth_str = f"{username}:{password}@" if username and password else ""
-                    final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/Streaming/Channels/101"
-                elif "CP Plus" in cam_type or "Dahua" in cam_type:
-                    auth_str = f"{username}:{password}@" if username and password else ""
-                    final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/cam/realmonitor?channel=1&subtype=0"
-                else: # Generic RTSP
-                    auth_str = f"{username}:{password}@" if username and password else ""
-                    final_stream_url = f"rtsp://{auth_str}{ip_address.strip()}:{port_num.strip()}/stream1"
-
-                st.markdown(f"""
-                <div style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; font-size:0.80rem; margin:8px 0;">
-                    <b>Generated Stream URL:</b> <code style="color:#0284C7;">{final_stream_url}</code>
-                </div>
-                """, unsafe_allow_html=True)
-
-            else:
-                final_stream_url = st.text_input(
-                    "Direct RTSP / HTTP URL",
-                    value="rtsp://admin:admin123@192.168.1.100:554/stream1"
-                )
-
-            fps_slider = st.slider("Sampling FPS (Inference frequency)", min_value=1, max_value=10, value=2)
-            
-            submit_btn = st.form_submit_button("🚀 Connect IP Camera & Start AI (இணைத்து AI தொடங்கு)", type="primary", use_container_width=True)
-            
-            if submit_btn:
-                if not final_stream_url.strip():
-                    st.error("Please enter a valid IP address or URL.")
-                else:
-                    with st.spinner(f"Connecting to camera stream at {final_stream_url}..."):
-                        res = connect_camera(
-                            stream_id=new_stream_id.strip(),
-                            rtsp_url=final_stream_url.strip(),
-                            segment_id=new_segment.strip(),
-                            label=new_label.strip(),
-                            fps_sample=fps_slider
-                        )
-                        if "error" in res:
-                            st.warning(f"Connection Alert: {res['error']}\n\nRegistered in queue. If the camera is on a separate router, verify the IP address matches your PC network.")
-                        else:
-                            st.success(f"🎉 IP Camera '{new_stream_id}' successfully connected! Live YOLOv8 and Human Density tracking active!")
-                            st.rerun()
-
-    with col_guide:
-        st.markdown("""
-        <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:18px; box-shadow:0 1px 3px rgba(15,23,42,0.03);">
-            <div style="font-weight:700; color:#0F172A; font-size:0.95rem; margin-bottom:8px;">Router & Camera Setup Guide (வழிகாட்டி)</div>
-            
-            <div style="font-size:0.82rem; color:#475569; line-height:1.6;">
-                <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #F1F5F9;">
-                    <strong style="color:#0284C7;">1. ஒரே Wi-Fi நெட்வொர்க் (Same Network):</strong><br/>
-                    உங்கள் லேப்டாப் மற்றும் IP கேமரா இரண்டும் ஒரே Wi-Fi ரூட்டர் அல்லது மொபைல் ஹாட்ஸ்பாட்டில் இணைக்கப்பட்டிருக்க வேண்டும்.
-                </div>
-                
-                <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #F1F5F9;">
-                    <strong style="color:#0284C7;">2. கேமராவின் IP அட்ரஸை கண்டறிவது எப்படி?</strong><br/>
-                    • ரூட்டர் அட்மின் பக்கம் (<code>192.168.1.1</code>) சென்று 'Connected Devices' பட்டியலில் கேமராவின் IP-யை பார்க்கலாம்.<br/>
-                    • அல்லது கேமராவின் மொபைல் ஆப்பில் (Ezviz, Mi, CP Plus) நெட்வொர்க் செட்டிங்ஸில் IP தெரியும் (எ.கா: <code>192.168.1.120</code>).
-                </div>
-                
-                <div style="margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #F1F5F9;">
-                    <strong style="color:#0284C7;">3. மொபைல் போனை IP கேமராவாக மாற்ற (Free Demo):</strong><br/>
-                    • உங்கள் ஸ்மார்ட்போனில் <b>'IP Webcam'</b> என்ற இலவச செயலியை இன்ஸ்டால் செய்யுங்கள்.<br/>
-                    • 'Start Server' கொடுத்தால் திரையில் IP முகவரி தோன்றும் (எ.கா: <code>http://192.168.1.50:8080/video</code>).<br/>
-                    • அந்த IP-யை இடதுபுறம் உள்ள படிவத்தில் போட்டால் உடனடி லைவ் வீடியோ ஆரம்பமாகும்!
-                </div>
-                
-                <div>
-                    <strong style="color:#0284C7;">4. லேப்டாப் வெப்கேம் சோதனை (Instant Test):</strong><br/>
-                    கேமரா இல்லாதபோது உடனடியாக சோதிக்க 'Laptop Built-in Webcam (0)' என்பதைத் தேர்ந்தெடுத்து இணைக்கலாம்.
-                </div>
+            st.markdown(f"""
+            <div style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; font-size:0.80rem; margin:8px 0;">
+                <b>Generated Stream URL:</b> <code style="color:#0284C7;">{final_stream_url}</code>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+
+        else:
+            final_stream_url = st.text_input(
+                "Direct RTSP / HTTP URL",
+                value="rtsp://admin:admin123@192.168.1.100:554/stream1"
+            )
+
+        fps_slider = st.slider("Sampling FPS (Frames per second to analyze)", min_value=1, max_value=10, value=2)
+        
+        submit_btn = st.form_submit_button("🚀 Connect IP Camera & Start AI Processing", type="primary", use_container_width=True)
+        
+        if submit_btn:
+            if not final_stream_url.strip():
+                st.error("Please enter a valid IP address or URL.")
+            else:
+                with st.spinner(f"Connecting to camera stream at {final_stream_url}..."):
+                    res = connect_camera(
+                        stream_id=new_stream_id.strip(),
+                        rtsp_url=final_stream_url.strip(),
+                        segment_id=new_segment.strip(),
+                        label=new_label.strip(),
+                        fps_sample=fps_slider
+                    )
+                    if "error" in res:
+                        st.warning(f"Connection Alert: {res['error']}\n\nRegistered in queue. If the camera is on a separate router, verify the IP address matches your PC network.")
+                    else:
+                        st.success(f"🎉 IP Camera '{new_stream_id}' successfully connected! Live YOLOv8 and Human Density tracking active!")
+                        st.rerun()
 
 
 # -------------------------------------------------------------
 # TAB 3: OBJECT CLASSIFICATION & HUMAN DENSITY ANALYTICS
 # -------------------------------------------------------------
 with tab3:
-    st.subheader("Multi-Class Object Distribution & Human Density Analytics (பொருட்கள் & மக்கள் அடர்த்தி பகுப்பாய்வு)")
+    st.subheader("Multi-Class Object Distribution & Human Density Analytics")
     
     col_chart, col_crowd = st.columns([7, 5])
     
     with col_chart:
         class_df = pd.DataFrame([
-            {"Class": "🚗 Cars (கார்)", "Count": cars, "PCU Factor": 1.0, "Color": "#10B981"},
-            {"Class": "🚌 Buses (பஸ்)", "Count": buses, "PCU Factor": 2.5, "Color": "#F59E0B"},
-            {"Class": "🚴 Cycles (சைக்கிள்)", "Count": cycles, "PCU Factor": 0.2, "Color": "#06B6D4"},
-            {"Class": "🏍️ Bikes (பைக்)", "Count": bikes, "PCU Factor": 0.5, "Color": "#EAB308"},
-            {"Class": "🚚 Trucks (லாரி)", "Count": trucks, "PCU Factor": 3.0, "Color": "#6366F1"},
-            {"Class": "🚶 Pedestrians (மனிதர்கள்)", "Count": humans, "PCU Factor": 0.0, "Color": "#EC4899"},
+            {"Class": "🚗 Cars", "Count": cars, "PCU Factor": 1.0, "Color": "#10B981"},
+            {"Class": "🚌 Buses", "Count": buses, "PCU Factor": 2.5, "Color": "#F59E0B"},
+            {"Class": "🚴 Cycles", "Count": cycles, "PCU Factor": 0.2, "Color": "#06B6D4"},
+            {"Class": "🏍️ Bikes", "Count": bikes, "PCU Factor": 0.5, "Color": "#EAB308"},
+            {"Class": "🚚 Trucks", "Count": trucks, "PCU Factor": 3.0, "Color": "#6366F1"},
+            {"Class": "🚶 Pedestrians", "Count": humans, "PCU Factor": 0.0, "Color": "#EC4899"},
         ])
         
         fig_cls = px.bar(
@@ -321,12 +290,12 @@ with tab3:
             y="Count",
             color="Class",
             color_discrete_map={
-                "🚗 Cars (கார்)": "#10B981",
-                "🚌 Buses (பஸ்)": "#F59E0B",
-                "🚴 Cycles (சைக்கிள்)": "#06B6D4",
-                "🏍️ Bikes (பைக்)": "#EAB308",
-                "🚚 Trucks (லாரி)": "#6366F1",
-                "🚶 Pedestrians (மனிதர்கள்)": "#EC4899"
+                "🚗 Cars": "#10B981",
+                "🚌 Buses": "#F59E0B",
+                "🚴 Cycles": "#06B6D4",
+                "🏍️ Bikes": "#EAB308",
+                "🚚 Trucks": "#6366F1",
+                "🚶 Pedestrians": "#EC4899"
             },
             text="Count",
             title="Real-Time Detection Breakdown across 6 Classes"
@@ -371,14 +340,14 @@ with tab3:
         <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:18px;">
             <div style="font-weight:700; color:#0F172A; font-size:0.92rem; margin-bottom:8px;">Traffic Density Model (Passenger Car Units - PCU)</div>
             <p style="font-size:0.80rem; color:#475569; margin-bottom:10px;">
-                இந்திய சாலை விதிகளின்படி (IRC Standards) வாகனங்களின் ஒட்டுமொத்த அடர்த்தி PCU முறையில் கணக்கிடப்படுகிறது:
+                Calculated according to standard IRC (Indian Road Congress) equivalency guidelines:
             </p>
             <div style="background:#F1F5F9; border-radius:6px; padding:8px 12px; font-size:0.80rem; font-family:monospace; color:#0F172A; margin-bottom:12px;">
                 PCU = 1.0 &times; (Cars) + 2.5 &times; (Buses) + 3.0 &times; (Trucks) + 0.5 &times; (Bikes) + 0.2 &times; (Cycles)
             </div>
             <div style="font-size:0.78rem; color:#64748B; line-height:1.5;">
-                • <b>ByteTrack Centroid Tracker:</b> வாகனங்களின் ID-ஐ ஃபிரேம்களுக்கு இடையே தொடர்ச்சியாக கண்காணிக்கிறது.<br/>
-                • <b>Real-Time Speed & Queue:</b> அடர்த்திக்கு ஏற்ப சராசரி வேகத்தை (km/h) தானாகக் கணக்கிடுகிறது.
+                • <b>ByteTrack Centroid Tracker:</b> Continuously associates detection IDs across successive frames.<br/>
+                • <b>Real-Time Speed & Queue:</b> Automatically estimates dynamic segment speeds (km/h) based on spatial density.
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -388,15 +357,15 @@ with tab3:
         <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:18px;">
             <div style="font-weight:700; color:#0F172A; font-size:0.92rem; margin-bottom:8px;">Human Density & Pedestrian Safety Protocol</div>
             <p style="font-size:0.80rem; color:#475569; margin-bottom:10px;">
-                ஜீப்ரா கிராசிங் மற்றும் சந்திப்புகளில் மனிதர்களின் எண்ணிக்கை (Crowd Density) அடிப்படையில் சிக்னல் முடிவு செய்யப்படுகிறது:
+                Junction signal preemption timings adapt dynamically based on detected pedestrian crosswalk density:
             </p>
             <div style="background:#F1F5F9; border-radius:6px; padding:8px 12px; font-size:0.80rem; font-family:monospace; color:#0F172A; margin-bottom:12px;">
                 T_clearance = Base_Clearance (3s) + 0.8s &times; min(Pedestrians, 10)
             </div>
             <div style="font-size:0.78rem; color:#64748B; line-height:1.5;">
-                • <b>Low (0 - 4 Persons):</b> ஆம்புலன்ஸுக்கு உடனடி கிரீன் சிக்னல்.<br/>
-                • <b>Moderate (5 - 10 Persons):</b> பாதசாரிகள் சாலையைக் கடக்க 3 வினாடி எச்சரிக்கை ஒலி & சிக்னல் டிலே.<br/>
-                • <b>Crowded (> 10 Persons):</b> இரு-சுர ஆம்புலன்ஸ் சைரன் மூலம் பொதுமக்களுக்கு எச்சரிக்கை.
+                • <b>Low (0 - 4 Persons):</b> Direct preemption with instantaneous green wave for the emergency corridor.<br/>
+                • <b>Moderate (5 - 10 Persons):</b> Extended 3-second yellow cautionary phase before green transition.<br/>
+                • <b>Crowded (> 10 Persons):</b> Automated audible horn alert and phased pedestrian clearing before vehicle priority.
             </div>
         </div>
         """, unsafe_allow_html=True)
