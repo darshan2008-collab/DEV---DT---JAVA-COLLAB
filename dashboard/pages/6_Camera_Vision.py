@@ -159,21 +159,28 @@ with tab1:
 
 
 # -------------------------------------------------------------
-# TAB 2: CONNECT IP CAMERA
+# TAB 2: CONNECT IP CAMERA (LINK OR IP ADDRESS)
 # -------------------------------------------------------------
 with tab2:
-    st.subheader("Connect Physical IP / RTSP Camera via Wi-Fi")
+    st.subheader("Connect IP / RTSP Camera via Direct Link or IP Address")
     
     st.markdown("""
     <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:16px; margin-bottom:14px;">
-        <div style="font-weight:700; color:#0F172A; font-size:1.0rem; margin-bottom:4px;">IP Camera Connection Wizard</div>
-        <div style="font-size:0.82rem; color:#64748B;">Enter the IP address of your network camera or mobile IP camera app to establish a real-time RTSP/HTTP stream.</div>
+        <div style="font-weight:700; color:#0F172A; font-size:1.0rem; margin-bottom:4px;">Dual-Mode Camera Ingestion</div>
+        <div style="font-size:0.84rem; color:#475569;">
+            You can connect your camera using either of the two methods below:<br/>
+            • <b>Method 1: Direct Camera Link (RTSP / HTTP URL)</b> — Paste your full camera stream link directly.<br/>
+            • <b>Method 2: Camera IP Address</b> — Enter only the local IP address (e.g. <code>192.168.1.100</code>) and the system automatically generates the RTSP connection string.
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     conn_mode = st.radio(
-        "Connection Mode:",
-        ["⚡ Direct IP Address Configuration (Recommended)", "🔗 Full RTSP / HTTP Stream URL"],
+        "Choose Connection Method:",
+        [
+            "🔗 Method 1: Connect via Camera Stream Link (Direct RTSP / HTTP URL)",
+            "🌐 Method 2: Connect via Camera IP Address (Auto-Generates RTSP Link)"
+        ],
         index=0
     )
 
@@ -188,8 +195,21 @@ with tab2:
         
         final_stream_url = ""
 
-        if "Direct IP Address" in conn_mode:
-            st.markdown("<div style='font-size:0.85rem; font-weight:600; color:#0284C7; margin:8px 0 4px 0;'>Camera Network Parameters:</div>", unsafe_allow_html=True)
+        if "Method 1" in conn_mode:
+            st.markdown("<div style='font-size:0.85rem; font-weight:600; color:#0284C7; margin:8px 0 4px 0;'>Paste Full Camera RTSP / HTTP Link:</div>", unsafe_allow_html=True)
+            final_stream_url = st.text_input(
+                "Camera Stream Link (RTSP / HTTP URL)",
+                value="rtsp://admin:admin123@192.168.1.100:554/stream1",
+                help="Examples: rtsp://username:password@192.168.1.x:554/stream1, http://192.168.1.x:8080/video, or 0 for local webcam"
+            )
+            st.markdown("""
+            <div style="font-size:0.78rem; color:#64748B; margin-top:-6px; margin-bottom:8px;">
+                💡 <b>Supported Stream Protocols:</b> <code>rtsp://</code> (Standard IP Cameras, Hikvision, CP Plus, Dahua) | <code>http://.../video</code> (Smartphone IP Webcam) | <code>0</code> (Laptop Webcam)
+            </div>
+            """, unsafe_allow_html=True)
+
+        else:
+            st.markdown("<div style='font-size:0.85rem; font-weight:600; color:#0284C7; margin:8px 0 4px 0;'>Enter Camera IP Address & Select Preset:</div>", unsafe_allow_html=True)
             cam_type = st.selectbox(
                 "Camera Protocol / Brand Preset:",
                 [
@@ -215,7 +235,7 @@ with tab2:
             with c_pass:
                 password = st.text_input("Password (Optional)", value="", type="password")
 
-            # Dynamically construct the stream URL
+            # Dynamically construct the stream URL from IP Address
             if "Laptop" in cam_type:
                 final_stream_url = "0"
             elif "IP Webcam" in cam_type:
@@ -233,25 +253,19 @@ with tab2:
 
             st.markdown(f"""
             <div style="background:#F1F5F9; border:1px solid #CBD5E1; border-radius:6px; padding:8px 12px; font-size:0.80rem; margin:8px 0;">
-                <b>Generated Stream URL:</b> <code style="color:#0284C7;">{final_stream_url}</code>
+                <b>Compiled Stream Link:</b> <code style="color:#0284C7;">{final_stream_url}</code>
             </div>
             """, unsafe_allow_html=True)
 
-        else:
-            final_stream_url = st.text_input(
-                "Direct RTSP / HTTP URL",
-                value="rtsp://admin:admin123@192.168.1.100:554/stream1"
-            )
-
         fps_slider = st.slider("Sampling FPS (Frames per second to analyze)", min_value=1, max_value=10, value=2)
         
-        submit_btn = st.form_submit_button("🚀 Connect IP Camera & Start AI Processing", type="primary", use_container_width=True)
+        submit_btn = st.form_submit_button("🚀 Connect Camera & Start AI Processing", type="primary", use_container_width=True)
         
         if submit_btn:
             if not final_stream_url.strip():
-                st.error("Please enter a valid IP address or URL.")
+                st.error("Please enter a valid camera link or IP address.")
             else:
-                with st.spinner(f"Connecting to camera stream at {final_stream_url}..."):
+                with st.spinner(f"Connecting to camera at {final_stream_url}..."):
                     res = connect_camera(
                         stream_id=new_stream_id.strip(),
                         rtsp_url=final_stream_url.strip(),
@@ -260,9 +274,10 @@ with tab2:
                         fps_sample=fps_slider
                     )
                     if "error" in res:
-                        st.warning(f"Connection Alert: {res['error']}\n\nRegistered in queue. If the camera is on a separate router, verify the IP address matches your PC network.")
+                        st.warning(f"Connection Alert: {res['error']}\n\nRegistered in queue. Ensure the camera device is powered and reachable on your Wi-Fi network.")
                     else:
-                        st.success(f"🎉 IP Camera '{new_stream_id}' successfully connected! Live YOLOv8 and Human Density tracking active!")
+                        st.success(f"🎉 Camera '{new_stream_id}' successfully connected! Live YOLOv8 object detection and crowd tracking active!")
+                        st.rerun()
                         st.rerun()
 
 
