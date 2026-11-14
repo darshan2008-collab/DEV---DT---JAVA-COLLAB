@@ -16,6 +16,8 @@ from components.icons import (
     SVG_SHIELD
 )
 from components.api_client import get_hospitals, get_trips, get_ambulances
+from components.map_utils import KARUR_DISTRICT_HOSPITALS, create_network_map
+from streamlit_folium import st_folium
 
 st.set_page_config(
     page_title="Hospital Inflow & Trauma Console",
@@ -259,6 +261,75 @@ with col_right:
     )
     fig.update_traces(texttemplate='%{text:.1f}m', textposition='outside')
     st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+# ============================================================================
+# KARUR DISTRICT HEALTHCARE GIS & HOSPITAL DIRECTORY MAP
+# ============================================================================
+st.subheader("Karur District Healthcare Facilities & Emergency GIS Map (கரூர் மாவட்ட மருத்துவ வரைபடம்)")
+st.markdown(
+    "<div style='font-size:0.9rem; color:#475569; margin-bottom:12px;'>"
+    "📍 <b>கரூர் மாவட்டம் எல்லைக்குள் உள்ள மருத்துவமனைகள் & கிளினிக்குகள் மட்டும் (Exclusively Karur District).</b> "
+    "Highlighted with 🔴 Govt Medical College/Hospitals, 🔵 Private Multispeciality, 🟢 Primary Health Centres (PHC), and 🟣 Speciality Clinics."
+    "</div>",
+    unsafe_allow_html=True
+)
+
+c_filter1, c_filter2 = st.columns([4, 6])
+with c_filter1:
+    hosp_type_selected = st.selectbox(
+        "Filter Facility Category (வகைப்பாடு):",
+        ["All Karur Facilities (அனைத்தும்)", "Govt Medical College", "Govt Hospital", "Private Multispeciality", "Clinic & Nursing Home", "Primary Health Centre (PHC/UPHC)"],
+        index=0,
+        key="inflow_hosp_filter"
+    )
+
+with c_filter2:
+    # Summary Metrics across filtered facilities
+    filter_val = None if "All" in hosp_type_selected else hosp_type_selected
+    filtered_list = [h for h in KARUR_DISTRICT_HOSPITALS if (filter_val is None or h["category"] == filter_val)]
+    tot_beds = sum(h["beds"] for h in filtered_list)
+    tot_icu = sum(h["icu_beds"] for h in filtered_list)
+    tot_bays = sum(h["trauma_bays"] for h in filtered_list)
+
+    st.markdown(f"""
+    <div style='display:flex; gap:16px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 16px; margin-top:4px;'>
+        <div><span style='font-size:0.75rem; color:#64748B; font-weight:bold;'>FACILITIES</span><br><b style='color:#0F172A; font-size:1.1rem;'>{len(filtered_list)} Units</b></div>
+        <div><span style='font-size:0.75rem; color:#64748B; font-weight:bold;'>TOTAL BEDS</span><br><b style='color:#0284C7; font-size:1.1rem;'>{tot_beds:,}</b></div>
+        <div><span style='font-size:0.75rem; color:#64748B; font-weight:bold;'>ICU CAPACITY</span><br><b style='color:#DC2626; font-size:1.1rem;'>{tot_icu}</b></div>
+        <div><span style='font-size:0.75rem; color:#64748B; font-weight:bold;'>TRAUMA BAYS</span><br><b style='color:#D97706; font-size:1.1rem;'>{tot_bays}</b></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Render the Karur District Map
+karur_map = create_network_map(
+    active_route="Route B",
+    ambulance_pos=[10.9620, 78.0820],
+    show_hospitals=True,
+    category_filter=filter_val,
+    zoom_start=12
+)
+st_folium(karur_map, width=None, height=450, returned_objects=[])
+
+# Directory of Karur District Healthcare Facilities
+with st.expander("📋 View Complete Karur District Healthcare Directory (20 Facilities With Emergency Contacts)"):
+    hosp_df = pd.DataFrame([
+        {
+            "Facility Name": h["name"],
+            "Tamil Name (தமிழ் பெயர்)": h["tamil_name"],
+            "Category": h["category"],
+            "Beds": h["beds"],
+            "ICU Beds": h["icu_beds"],
+            "Trauma Bays": h["trauma_bays"],
+            "Emergency Contact": h["ambulance_contact"],
+            "Blood Bank": h["blood_bank"],
+            "Address": h["address"]
+        } for h in filtered_list
+    ])
+    st.dataframe(hosp_df, use_container_width=True, hide_index=True)
+
+st.divider()
 
 # Hospital Inflow Audit Log
 st.subheader("Hospital Gate & Inflow Telemetry Log")
