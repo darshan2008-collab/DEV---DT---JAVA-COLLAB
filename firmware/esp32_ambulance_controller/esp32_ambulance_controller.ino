@@ -14,9 +14,8 @@
  *    [ R ] Pin -> ESP32 GPIO 18 (Red LED)
  *    [ Y ] Pin -> ESP32 GPIO 19 (Yellow LED)
  *    [ G ] Pin -> ESP32 GPIO 23 (Green LED)
- *    (330 Ohm resistors are already integrated on the PCB module!)
  * 
- * 2. JLG1295-5 BUZZER (Marked with '+' on side):
+ * 2. JLG1295-5 BUZZER (Passive Electromagnetic Buzzer):
  *    [(+)] Pin (Long lead / near '+' mark) -> ESP32 GPIO 25
  *    [(-)] Pin (Short lead)               -> ESP32 GND
  * 
@@ -59,15 +58,16 @@ unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
 String staIpStr = "Connecting...";
 
-// Quick tactile confirmation beep (No default argument to prevent Arduino IDE preprocessor errors)
-void beepFeedback(int durationMs) {
-  digitalWrite(PIN_BUZZER, HIGH);
+// Audible Frequency Tone Beep for Passive JLG1295 Buzzer
+void beepFeedback(int frequencyHz, int durationMs) {
+  tone(PIN_BUZZER, frequencyHz);
   delay(durationMs);
+  noTone(PIN_BUZZER);
   digitalWrite(PIN_BUZZER, LOW);
 }
 
 void beepFeedback() {
-  beepFeedback(70);
+  beepFeedback(2400, 80);
 }
 
 // Update OLED Screen using U8G2
@@ -127,28 +127,28 @@ void applySignal(String signal) {
   sirenActive = false;
   currentSignal = signal;
 
-  // Immediately silence any ongoing siren tone
+  // Immediately silence ongoing tones
   noTone(PIN_BUZZER);
   digitalWrite(PIN_BUZZER, LOW);
 
   if (signal == "RED") {
     setTrafficLights(true, false, false);
-    beepFeedback(80); // 1 short confirmation beep
+    beepFeedback(1800, 100); // 1.8 kHz clear tone for RED
   } else if (signal == "YELLOW") {
     setTrafficLights(false, true, false);
-    beepFeedback(60);
+    beepFeedback(2200, 80);  // 2.2 kHz caution tone for YELLOW
   } else if (signal == "GREEN") {
     setTrafficLights(false, false, true);
-    // Double beep for priority green confirmation
-    beepFeedback(50);
+    // Double Pip-Pip Beep for Ambulance Priority GREEN!
+    beepFeedback(2600, 60);
     delay(40);
-    beepFeedback(50);
+    beepFeedback(2600, 60);
   } else if (signal == "SIREN") {
     sirenActive = true;
   } else { // OFF
     setTrafficLights(false, false, false);
     currentSignal = "OFF";
-    beepFeedback(100);
+    beepFeedback(1200, 120); // 1.2 kHz tone for OFF
   }
 
   updateOled(currentSignal);
@@ -230,11 +230,11 @@ void setup() {
   noTone(PIN_BUZZER);
   digitalWrite(PIN_BUZZER, LOW);
 
-  // 3. Hardware Self-Test: Cycle Red -> Yellow -> Green with short beeps
+  // 3. Hardware Self-Test: Cycle Red -> Yellow -> Green with loud tone beeps!
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setTrafficLights(true, false, false);  beepFeedback(40); delay(300); // Red
-  setTrafficLights(false, true, false);  beepFeedback(40); delay(300); // Yellow
-  setTrafficLights(false, false, true);  beepFeedback(60); delay(300); // Green
+  setTrafficLights(true, false, false);  beepFeedback(1800, 60); delay(250); // Red (1.8kHz)
+  setTrafficLights(false, true, false);  beepFeedback(2200, 60); delay(250); // Yellow (2.2kHz)
+  setTrafficLights(false, false, true);  beepFeedback(2600, 80); delay(250); // Green (2.6kHz)
   setTrafficLights(false, false, false); delay(150); // Off
 
   // 4. Wi-Fi Dual Mode: AP + STA

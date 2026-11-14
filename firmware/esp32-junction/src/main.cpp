@@ -35,14 +35,15 @@ unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
 String staIpStr = "Connecting...";
 
-void beepFeedback(int durationMs) {
-  digitalWrite(PIN_BUZZER, HIGH);
+void beepFeedback(int frequencyHz, int durationMs) {
+  tone(PIN_BUZZER, frequencyHz);
   delay(durationMs);
+  noTone(PIN_BUZZER);
   digitalWrite(PIN_BUZZER, LOW);
 }
 
 void beepFeedback() {
-  beepFeedback(70);
+  beepFeedback(2400, 80);
 }
 
 void updateOled(String signalName) {
@@ -99,21 +100,21 @@ void applySignal(String signal) {
 
   if (signal == "RED") {
     setTrafficLights(true, false, false);
-    beepFeedback(80);
+    beepFeedback(1800, 100);
   } else if (signal == "YELLOW") {
     setTrafficLights(false, true, false);
-    beepFeedback(60);
+    beepFeedback(2200, 80);
   } else if (signal == "GREEN") {
     setTrafficLights(false, false, true);
-    beepFeedback(50);
+    beepFeedback(2600, 60);
     delay(40);
-    beepFeedback(50);
+    beepFeedback(2600, 60);
   } else if (signal == "SIREN") {
     sirenActive = true;
   } else {
     setTrafficLights(false, false, false);
     currentSignal = "OFF";
-    beepFeedback(100);
+    beepFeedback(1200, 120);
   }
 
   updateOled(currentSignal);
@@ -190,9 +191,9 @@ void setup() {
   digitalWrite(PIN_BUZZER, LOW);
 
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setTrafficLights(true, false, false);  beepFeedback(40); delay(300);
-  setTrafficLights(false, true, false);  beepFeedback(40); delay(300);
-  setTrafficLights(false, false, true);  beepFeedback(60); delay(300);
+  setTrafficLights(true, false, false);  beepFeedback(1800, 60); delay(250);
+  setTrafficLights(false, true, false);  beepFeedback(2200, 60); delay(250);
+  setTrafficLights(false, false, true);  beepFeedback(2600, 80); delay(250);
   setTrafficLights(false, false, false); delay(150);
 
   WiFi.mode(WIFI_AP_STA);
