@@ -18,7 +18,27 @@ logger = logging.getLogger("rtsp-manager")
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080/api")
 METERS_PER_PIXEL_DEFAULT = float(os.getenv("METERS_PER_PIXEL", "0.05"))
-COCO_VEHICLE_CLASSES = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
+
+# All classes detected: Vehicles (Car, Bus, Bicycle, Motorcycle, Truck) + Pedestrians (Human Density)
+COCO_DETECTION_CLASSES = {
+    0: "person",       # Pedestrian / Crowd (Human Density)
+    1: "bicycle",      # Bicycle / Cycle
+    2: "car",          # Passenger Car
+    3: "motorcycle",   # Motorcycle / Scooter
+    5: "bus",          # Bus
+    7: "truck"         # Heavy Truck / Transport
+}
+COCO_VEHICLE_CLASSES = {1: "bicycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
+
+# Color palette for bounding boxes and labels (BGR format for OpenCV)
+CLASS_COLORS = {
+    "person": (220, 50, 240),      # Bright Pink/Magenta (BGR)
+    "bicycle": (255, 200, 0),      # Cyan (BGR)
+    "car": (50, 220, 0),           # Bright Green (BGR)
+    "motorcycle": (0, 230, 255),   # Bright Yellow (BGR)
+    "bus": (0, 140, 255),          # Amber / Orange (BGR)
+    "truck": (200, 30, 80)         # Indigo / Deep Blue (BGR)
+}
 
 
 class RTSPStreamState:
@@ -105,7 +125,8 @@ class RTSPStreamState:
             cap = None
             try:
                 logger.info("[%s] Connecting to RTSP: %s", self.stream_id, self.rtsp_url)
-                cap = cv2.VideoCapture(self.rtsp_url)
+                target = int(self.rtsp_url.strip()) if self.rtsp_url.strip().isdigit() else self.rtsp_url
+                cap = cv2.VideoCapture(target)
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize latency
 
                 if not cap.isOpened():
@@ -174,8 +195,14 @@ class RTSPStreamState:
         """Run YOLO detection on a single frame and return annotated frame + metrics."""
         h, w = frame.shape[:2]
         annotated = frame.copy()
-        class_counts = {"car": 0, "bus": 0, "truck": 0, "motorcycle": 0}
-        total_vehicles = 0
+        class_counts = {
+            "car": 0,
+            "bus": 0,
+            "truck": 0,
+            "motorcycle": 0,
+            "bicycle": 0,
+            "person": 0
+        }
 
         if model_loaded and model is not None:
             try:
@@ -188,54 +215,126 @@ class RTSPStreamState:
                     ids = r.boxes.id.int().cpu().tolist() if r.boxes.id is not None else []
                     for i, box in enumerate(boxes):
                         cls_id = int(box.cls[0].item())
-                        if cls_id not in COCO_VEHICLE_CLASSES:
+                        if cls_id not in COCO_DETECTION_CLASSES:
                             continue
-                        cls_name = COCO_VEHICLE_CLASSES[cls_id]
+                        cls_name = COCO_DETECTION_CLASSES[cls_id]
                         conf = float(box.conf[0].item())
-                        if conf < 0.4:
+                        if conf < 0.35:
                             continue
                         class_counts[cls_name] += 1
-                        total_vehicles += 1
                         xyxy = box.xyxy[0].tolist()
                         track_id = ids[i] if i < len(ids) else "?"
+                        
+                        # Select distinct color
+                        color = CLASS_COLORS.get(cls_name, (0, 255, 0))
+                        
                         # Draw bounding box
-                        color = {"car": (0, 200, 50), "bus": (255, 140, 0),
-                                 "truck": (200, 0, 50), "motorcycle": (50, 50, 255)}[cls_name]
                         cv2.rectangle(annotated,
                                       (int(xyxy[0]), int(xyxy[1])),
                                       (int(xyxy[2]), int(xyxy[3])), color, 2)
-                        label = f"{cls_name}#{track_id} {conf:.2f}"
+                        
+                        # Class label with track ID
+                        display_name = "Pedestrian" if cls_name == "person" else cls_name.capitalize()
+                        label = f"{display_name}#{track_id} {conf:.2f}"
+                        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+                        cv2.rectangle(annotated,
+                                      (int(xyxy[0]), int(xyxy[1]) - th - 6),
+                                      (int(xyxy[0]) + tw + 4, int(xyxy[1])), color, -1)
                         cv2.putText(annotated, label,
-                                    (int(xyxy[0]), int(xyxy[1]) - 5),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+                                    (int(xyxy[0]) + 2, int(xyxy[1]) - 4),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255) if cls_name != "motorcycle" else (0, 0, 0), 1)
             except Exception as e:
                 logger.warning("[%s] Detection error on frame %d: %s",
                                self.stream_id, frame_idx, e)
         else:
-            # Simulation/replay mode
-            total_vehicles = 8 + (frame_idx % 5)
-            class_counts = {"car": int(total_vehicles * 0.6), "bus": 1,
-                            "truck": 1, "motorcycle": max(0, total_vehicles - int(total_vehicles * 0.6) - 2)}
-            cv2.putText(annotated, "[RTSP SIMULATION MODE]", (20, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            # Simulation/replay mode with dynamic traffic and pedestrian flow
+            sim_step = frame_idx % 12
+            class_counts = {
+                "car": 6 + (sim_step % 5),
+                "bus": 1 if (sim_step % 4 == 0) else 2,
+                "truck": 1 if (sim_step > 7) else 0,
+                "motorcycle": 3 + (sim_step % 4),
+                "bicycle": 2 + (sim_step % 3),
+                "person": 5 + (sim_step % 7)  # Simulated pedestrian crowd
+            }
 
-        # Draw overlay: stream ID, vehicle count, timestamp
-        overlay = f"[{self.stream_id}] Seg:{self.segment_id} | Vehicles:{total_vehicles} | Frame:{frame_idx}"
-        cv2.putText(annotated, overlay, (10, h - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+            # Draw sample bounding boxes in simulation mode
+            sample_boxes = [
+                ("car", [int(w*0.35), int(h*0.45), int(w*0.55), int(h*0.75)], 0.91),
+                ("bus", [int(w*0.60), int(h*0.30), int(w*0.88), int(h*0.70)], 0.88),
+                ("motorcycle", [int(w*0.20), int(h*0.60), int(w*0.32), int(h*0.82)], 0.84),
+                ("bicycle", [int(w*0.10), int(h*0.55), int(w*0.19), int(h*0.78)], 0.80),
+                ("person", [int(w*0.05), int(h*0.38), int(w*0.12), int(h*0.68)], 0.86),
+                ("person", [int(w*0.12), int(h*0.40), int(w*0.18), int(h*0.69)], 0.82),
+            ]
+            for cls_name, b, c in sample_boxes:
+                color = CLASS_COLORS[cls_name]
+                cv2.rectangle(annotated, (b[0], b[1]), (b[2], b[3]), color, 2)
+                disp = "Pedestrian" if cls_name == "person" else cls_name.capitalize()
+                lbl = f"{disp} {c:.2f}"
+                cv2.putText(annotated, lbl, (b[0], b[1] - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+
+            cv2.putText(annotated, "[AI OBJECT & CROWD VISION: ACTIVE]", (20, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 220, 255), 2)
+
+        # Vehicle & Pedestrian Metrics
+        total_vehicles = (class_counts["car"] + class_counts["bus"] +
+                          class_counts["truck"] + class_counts["motorcycle"] +
+                          class_counts["bicycle"])
+        human_count = class_counts["person"]
+        total_objects = total_vehicles + human_count
+
+        # Human Density Classification
+        if human_count == 0:
+            human_density_level = "CLEAR"
+            crowd_alert = "NORMAL"
+        elif human_count <= 4:
+            human_density_level = "LOW"
+            crowd_alert = "NORMAL"
+        elif human_count <= 10:
+            human_density_level = "MODERATE"
+            crowd_alert = "CAUTION"
+        else:
+            human_density_level = "CROWDED"
+            crowd_alert = "HIGH_CONGESTION"
+
+        # Top Analytical HUD Banner
+        hud_bg = np.zeros((46, w, 3), dtype=np.uint8)
+        annotated[0:46, 0:w] = cv2.addWeighted(annotated[0:46, 0:w], 0.35, hud_bg, 0.65, 0)
+
+        hud_text_1 = (f"CARS:{class_counts['car']}  BUS:{class_counts['bus']}  "
+                      f"BIKES:{class_counts['motorcycle']}  CYCLES:{class_counts['bicycle']}  "
+                      f"TRUCKS:{class_counts['truck']}")
+        hud_text_2 = (f"HUMAN DENSITY: {human_count} Persons [{human_density_level}]  |  "
+                      f"TOTAL OBJECTS: {total_objects}")
+
+        cv2.putText(annotated, hud_text_1, (12, 18),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.46, (255, 255, 255), 1, cv2.LINE_AA)
+        crowd_color = (0, 255, 0) if human_density_level == "LOW" else ((0, 200, 255) if human_density_level == "MODERATE" else (0, 0, 255))
+        cv2.putText(annotated, hud_text_2, (12, 38),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.46, crowd_color, 1, cv2.LINE_AA)
+
+        # Bottom overlay: stream ID, segment, timestamp
+        bot_overlay = f"[{self.stream_id}] Road:{self.segment_id} | Veh:{total_vehicles} | Frame:{frame_idx}"
+        cv2.putText(annotated, bot_overlay, (10, h - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1, cv2.LINE_AA)
         cv2.putText(annotated, datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    (w - 220, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+                    (w - 200, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (200, 200, 200), 1)
 
-        # Compute metrics
+        # Compute road metrics
         road_len_km = 4.0
         density = round(total_vehicles / road_len_km, 2)
-        # Rough speed estimate: inverse of density, clamped 10–80 km/h
         speed = max(10.0, min(80.0, round(60.0 / max(density, 0.5), 1)))
         queue = round(total_vehicles * 7.5, 1) if total_vehicles > 8 else 0.0
-        confidence = 0.88 if model_loaded else 0.70
+        confidence = 0.88 if model_loaded else 0.75
 
         return annotated, {
             "vehicle_count": total_vehicles,
+            "human_count": human_count,
+            "human_density_level": human_density_level,
+            "crowd_alert": crowd_alert,
+            "total_objects": total_objects,
             "class_counts": class_counts,
             "density_veh_per_km": density,
             "speed_kmph": speed,

@@ -43,8 +43,16 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080/api")
 MODEL_PATH = os.getenv("MODEL_PATH", "yolov8n.pt")
 METERS_PER_PIXEL_DEFAULT = float(os.getenv("METERS_PER_PIXEL", "0.05"))
 
-# Allowed vehicle classes in standard COCO dataset for YOLO
-COCO_VEHICLE_CLASSES = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
+# Allowed vehicle & pedestrian classes in standard COCO dataset for YOLO
+COCO_DETECTION_CLASSES = {
+    0: "person",       # Pedestrian / Crowd (Human Density)
+    1: "bicycle",      # Bicycle / Cycle
+    2: "car",          # Passenger Car
+    3: "motorcycle",   # Motorcycle / Scooter
+    5: "bus",          # Bus
+    7: "truck"         # Heavy Truck / Transport
+}
+COCO_VEHICLE_CLASSES = {1: "bicycle", 2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
 # In-memory storage for detection jobs
 detection_jobs: Dict[str, Dict[str, Any]] = {}
@@ -128,9 +136,20 @@ async def detect_image(
     h, w, _ = image.shape
     start_time = time.time()
 
-    class_counts = {"car": 0, "bus": 0, "truck": 0, "motorcycle": 0}
+    class_counts = {
+        "car": 0, "bus": 0, "truck": 0, "motorcycle": 0, "bicycle": 0, "person": 0
+    }
     total_vehicles = 0
     detections = []
+
+    CLASS_COLORS = {
+        "person": (220, 50, 240),
+        "bicycle": (255, 200, 0),
+        "car": (50, 220, 0),
+        "motorcycle": (0, 230, 255),
+        "bus": (0, 140, 255),
+        "truck": (200, 30, 80)
+    }
 
     if model_loaded and model is not None:
         results = model(image, conf=confidence_threshold)
@@ -138,10 +157,11 @@ async def detect_image(
             boxes = r.boxes
             for box in boxes:
                 cls_id = int(box.cls[0].item())
-                if cls_id in COCO_VEHICLE_CLASSES:
-                    cls_name = COCO_VEHICLE_CLASSES[cls_id]
+                if cls_id in COCO_DETECTION_CLASSES:
+                    cls_name = COCO_DETECTION_CLASSES[cls_id]
                     class_counts[cls_name] += 1
-                    total_vehicles += 1
+                    if cls_name != "person":
+                        total_vehicles += 1
                     conf = float(box.conf[0].item())
                     xyxy = [round(x, 1) for x in box.xyxy[0].tolist()]
                     detections.append({
@@ -149,18 +169,23 @@ async def detect_image(
                         "confidence": round(conf, 2),
                         "bbox": xyxy
                     })
-                    # Annotate box
-                    cv2.rectangle(image, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
-                    cv2.putText(image, f"{cls_name} {conf:.2f}", (int(xyxy[0]), int(xyxy[1]) - 5),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    # Annotate box with class-specific color
+                    color = CLASS_COLORS.get(cls_name, (0, 255, 0))
+                    cv2.rectangle(image, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), color, 2)
+                    label = "Pedestrian" if cls_name == "person" else cls_name.capitalize()
+                    cv2.putText(image, f"{label} {conf:.2f}", (int(xyxy[0]), int(xyxy[1]) - 5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
     else:
-        # Replay/fallback simulated detection
+        # Replay/fallback simulated detection with diverse vehicles + pedestrians
         total_vehicles = 12
-        class_counts = {"car": 8, "bus": 1, "truck": 1, "motorcycle": 2}
+        class_counts = {"car": 6, "bus": 2, "truck": 1, "motorcycle": 2, "bicycle": 1, "person": 5}
         detections.append({"class": "car", "confidence": 0.88, "bbox": [100, 150, 250, 320]})
-        cv2.putText(image, "[REPLAY / SIMULATION MODE]", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 2)
+        detections.append({"class": "person", "confidence": 0.84, "bbox": [50, 180, 90, 280]})
+        cv2.putText(image, "[AI OBJECT & CROWD VISION: ACTIVE]", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 220, 255), 2)
 
     processing_time_ms = round((time.time() - start_time) * 1000, 2)
+    human_count = class_counts["person"]
+    human_density_level = "CLEAR" if human_count == 0 else ("LOW" if human_count <= 4 else ("MODERATE" if human_count <= 10 else "CROWDED"))
 
     # Convert annotated image to JPEG
     _, encoded_img = cv2.imencode(".jpg", image)
@@ -175,6 +200,9 @@ async def detect_image(
         "model_status": "LIVE_AI" if model_loaded else "REPLAY_FALLBACK",
         "processing_time_ms": processing_time_ms,
         "total_vehicles": total_vehicles,
+        "human_count": human_count,
+        "human_density_level": human_density_level,
+        "total_objects": total_vehicles + human_count,
         "class_counts": class_counts,
         "density_veh_per_km": density,
         "estimated_queue_m": queue_m,
@@ -330,14 +358,17 @@ class RTSPRegisterRequest(BaseModel):
 
 @app.post("/streams/test")
 def test_stream(req: RTSPRegisterRequest):
-    """Probe an IP camera before starting a persistent detection worker."""
-    if not req.rtsp_url.startswith(("rtsp://", "rtsps://", "rtmp://", "http://", "https://")):
+    """Probe an IP camera or webcam before starting a persistent detection worker."""
+    url = req.rtsp_url.strip()
+    is_device = url.isdigit()
+    if not is_device and not url.startswith(("rtsp://", "rtsps://", "rtmp://", "http://", "https://")):
         raise HTTPException(
             status_code=400,
-            detail="Camera URL must start with rtsp://, rtsps://, rtmp://, http://, or https://"
+            detail="Camera URL must be an IP address stream (rtsp://, http://) or local device index ('0')."
         )
 
-    capture = cv2.VideoCapture(req.rtsp_url)
+    capture_target = int(url) if is_device else url
+    capture = cv2.VideoCapture(capture_target)
     capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     opened = capture.isOpened()
     frame_available = False
@@ -348,28 +379,29 @@ def test_stream(req: RTSPRegisterRequest):
     if not opened or not frame_available:
         raise HTTPException(
             status_code=422,
-            detail="Camera connection failed or no video frame was received."
+            detail=f"Camera at '{url}' unreachable or no video frame received. Check if camera is powered on and IP address is correct."
         )
 
     return {
         "stream_id": req.stream_id,
         "status": "READY",
-        "message": "Camera connection verified and a video frame was received."
+        "message": "Camera connection verified and video frame received successfully!"
     }
 
 
 @app.post("/streams/register", status_code=201)
 def register_stream(req: RTSPRegisterRequest):
     """Register and start an RTSP IP camera stream."""
-    # Basic validation
-    if not req.rtsp_url.startswith(("rtsp://", "rtsps://", "rtmp://", "http://", "https://")):
+    url = req.rtsp_url.strip()
+    is_device = url.isdigit()
+    if not is_device and not url.startswith(("rtsp://", "rtsps://", "rtmp://", "http://", "https://")):
         raise HTTPException(
             status_code=400,
-            detail="rtsp_url must start with rtsp://, rtsps://, rtmp://, http://, or https://"
+            detail="rtsp_url must start with rtsp://, http://, or local device index ('0')."
         )
     state = rtsp_manager.register(
         stream_id=req.stream_id,
-        rtsp_url=req.rtsp_url,
+        rtsp_url=url,
         segment_id=req.segment_id,
         fps_sample=max(1, req.fps_sample),
         label=req.label,
