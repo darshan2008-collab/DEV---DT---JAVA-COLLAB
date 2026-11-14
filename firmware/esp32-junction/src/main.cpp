@@ -1,9 +1,10 @@
 /*
  * =========================================================================
- * Smart Ambulance Navigation System - ESP32 Miniature Traffic Light Controller
- * Hardware: 3-LED Traffic Light Module (R, Y, G, GND) + I2C 0.96" OLED (SSD1306)
- * Library: U8G2 (by olikraus)
- * Zero-Latency Architecture: Instant HTTP 200 responses, no redirects
+ * Smart Ambulance Navigation System - ESP32 Miniature Traffic Controller
+ * Hardware:
+ *   1. 3-LED Traffic Light Module (R, Y, G, GND)
+ *   2. I2C 0.96" OLED Display (SSD1306) via U8G2 Library
+ *   3. JLG1295-5 Electromagnetic Buzzer (Audio Feedback & Ambulance Siren)
  * =========================================================================
  */
 
@@ -20,9 +21,10 @@ const char* STA_PASS = "12345678";
 const char* AP_SSID  = "ESP32-AMBULANCE-SIGNAL";
 const char* AP_PASS  = "12345678";
 
-#define PIN_RED    18
-#define PIN_YELLOW 19
-#define PIN_GREEN  23
+#define PIN_RED        18
+#define PIN_YELLOW     19
+#define PIN_GREEN      23
+#define PIN_BUZZER     25
 #define PIN_ONBOARD_LED 2
 
 WebServer server(80);
@@ -32,6 +34,12 @@ bool sirenActive = false;
 unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
 String staIpStr = "Connecting...";
+
+void beepFeedback(int durationMs = 70) {
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(durationMs);
+  digitalWrite(PIN_BUZZER, LOW);
+}
 
 void updateOled(String signalName) {
   u8g2.clearBuffer();
@@ -52,7 +60,7 @@ void updateOled(String signalName) {
   } else if (signalName == "GREEN") {
     u8g2.drawStr(0, 29, "TRAFFIC: [GRN] GO-AMB");
   } else if (signalName == "SIREN") {
-    u8g2.drawStr(0, 29, "TRAFFIC: [EMERGENCY]");
+    u8g2.drawStr(0, 29, "SIREN: [WEE-WOO !]");
   } else {
     u8g2.drawStr(0, 29, "TRAFFIC: [ALL OFF]");
   }
@@ -66,7 +74,7 @@ void updateOled(String signalName) {
   u8g2.drawStr(0, 53, staLine.c_str());
 
   u8g2.setFont(u8g2_font_4x6_tf);
-  u8g2.drawStr(0, 62, "KARUR MEDICAL CORRIDOR | ACTIVE");
+  u8g2.drawStr(0, 62, "KARUR MEDICAL CORRIDOR | BUZZER ON");
 
   u8g2.sendBuffer();
 }
@@ -82,17 +90,26 @@ void applySignal(String signal) {
   sirenActive = false;
   currentSignal = signal;
 
+  noTone(PIN_BUZZER);
+  digitalWrite(PIN_BUZZER, LOW);
+
   if (signal == "RED") {
     setTrafficLights(true, false, false);
+    beepFeedback(80);
   } else if (signal == "YELLOW") {
     setTrafficLights(false, true, false);
+    beepFeedback(60);
   } else if (signal == "GREEN") {
     setTrafficLights(false, false, true);
+    beepFeedback(50);
+    delay(40);
+    beepFeedback(50);
   } else if (signal == "SIREN") {
     sirenActive = true;
   } else {
     setTrafficLights(false, false, false);
     currentSignal = "OFF";
+    beepFeedback(100);
   }
 
   updateOled(currentSignal);
@@ -100,7 +117,7 @@ void applySignal(String signal) {
 
 void handleRoot() {
   String html = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-  html += "<title>Traffic Signal Module Controller</title>";
+  html += "<title>Traffic Signal & Siren Controller</title>";
   html += "<style>body{font-family:sans-serif; text-align:center; background:#0F172A; color:#F8FAFC; padding:20px;}";
   html += "h1{color:#38BDF8; font-size:20px;}";
   html += ".btn{display:block; width:85%; max-width:320px; margin:10px auto; padding:14px; font-size:16px; font-weight:bold; border-radius:10px; border:none; text-decoration:none; color:white; cursor:pointer;}";
@@ -109,13 +126,13 @@ void handleRoot() {
   html += "</style><script>";
   html += "function sendCmd(cmd){fetch('/' + cmd).then(r=>location.reload());}";
   html += "</script></head><body>";
-  html += "<h1>ESP32 Traffic Signal Controller</h1>";
+  html += "<h1>ESP32 Signal &amp; Siren Controller</h1>";
   html += "<div class='status'>Active Signal: <strong style='color:#38BDF8;'>" + currentSignal + "</strong><br>";
-  html += "<small style='color:#94A3B8;'>Hardware: 3-LED Module (R, Y, G) + OLED</small></div>";
+  html += "<small style='color:#94A3B8;'>Hardware: 3-LED Module + JLG1295 Buzzer + OLED</small></div>";
   html += "<button class='btn btn-red' onclick=\"sendCmd('red')\">RED LIGHT (STOP TRAFFIC)</button>";
   html += "<button class='btn btn-yellow' onclick=\"sendCmd('yellow')\">YELLOW LIGHT (CLEARANCE)</button>";
   html += "<button class='btn btn-green' onclick=\"sendCmd('green')\">GREEN LIGHT (AMBULANCE GO)</button>";
-  html += "<button class='btn btn-siren' onclick=\"sendCmd('siren')\">EMERGENCY SIREN FLASH</button>";
+  html += "<button class='btn btn-siren' onclick=\"sendCmd('siren')\">AMBULANCE SIREN (WEE-WOO AUDIO)</button>";
   html += "<button class='btn btn-off' onclick=\"sendCmd('off')\">TURN OFF ALL LIGHTS</button>";
   html += "<p style='font-size:12px; color:#94A3B8; margin-top:20px;'>Karur Medical District | Corridor Node J2</p>";
   html += "</body></html>";
@@ -141,7 +158,7 @@ void handleSiren()  { applySignal("SIREN");  server.sendHeader("Access-Control-A
 void handleOff()    { applySignal("OFF");    server.sendHeader("Access-Control-Allow-Origin", "*"); server.send(200, "text/plain", "OK: OFF"); }
 
 void handleStatus() {
-  String json = "{\"status\":\"online\",\"signal\":\"" + currentSignal + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"module\":\"TRAFFIC_LIGHT_3LED\"}";
+  String json = "{\"status\":\"online\",\"signal\":\"" + currentSignal + "\",\"ip\":\"" + WiFi.localIP().toString() + "\",\"ap_ip\":\"" + WiFi.softAPIP().toString() + "\",\"module\":\"3LED_BUZZER_OLED\"}";
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200, "application/json", json);
 }
@@ -153,22 +170,26 @@ void setup() {
   u8g2.begin();
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_7x14B_tf);
-  u8g2.drawStr(6, 24, "TRAFFIC SIGNAL J2");
+  u8g2.drawStr(6, 24, "TRAFFIC & SIREN J2");
   u8g2.setFont(u8g2_font_6x10_tf);
   u8g2.drawStr(14, 44, "Booting ESP32...");
-  u8g2.drawStr(10, 58, "Hardware: R-Y-G");
+  u8g2.drawStr(8, 58, "R-Y-G + Buzzer Active");
   u8g2.sendBuffer();
 
   pinMode(PIN_RED, OUTPUT);
   pinMode(PIN_YELLOW, OUTPUT);
   pinMode(PIN_GREEN, OUTPUT);
+  pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_ONBOARD_LED, OUTPUT);
 
+  noTone(PIN_BUZZER);
+  digitalWrite(PIN_BUZZER, LOW);
+
   digitalWrite(PIN_ONBOARD_LED, HIGH);
-  setTrafficLights(true, false, false); delay(350);
-  setTrafficLights(false, true, false); delay(350);
-  setTrafficLights(false, false, true); delay(350);
-  setTrafficLights(false, false, false);delay(150);
+  setTrafficLights(true, false, false);  beepFeedback(40); delay(300);
+  setTrafficLights(false, true, false);  beepFeedback(40); delay(300);
+  setTrafficLights(false, false, true);  beepFeedback(60); delay(300);
+  setTrafficLights(false, false, false); delay(150);
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(AP_SSID, AP_PASS);
@@ -210,13 +231,15 @@ void loop() {
 
   if (sirenActive) {
     unsigned long currentMillis = millis();
-    if (currentMillis - lastSirenToggle >= 150) {
+    if (currentMillis - lastSirenToggle >= 260) {
       lastSirenToggle = currentMillis;
       sirenFlip = !sirenFlip;
       if (sirenFlip) {
         setTrafficLights(true, false, false);
+        tone(PIN_BUZZER, 960);
       } else {
         setTrafficLights(false, false, true);
+        tone(PIN_BUZZER, 680);
       }
     }
   }

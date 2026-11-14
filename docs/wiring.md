@@ -2,67 +2,40 @@
 
 ## 1. Prototype Overview
 
-The hardware demonstration prototype models a 4-way urban intersection controlled by an ESP32 microcontroller with Wi-Fi and MQTT connectivity.
+The hardware demonstration prototype models an urban emergency preemption intersection controlled by an ESP32 microcontroller with Wi-Fi and HTTP REST connectivity.
 
-- **North-South (NS) Direction:** Ambulance primary travel corridor.
-- **East-West (EW) Direction:** Cross-traffic corridor.
-- **Manual Override Button:** Immediate fail-safe input on GPIO 32.
+- **3-LED Traffic Light Module:** Red, Yellow, Green signal heads with built-in 330Ω resistors.
+- **I2C 0.96" OLED Display (SSD1306):** Displays junction telemetry, live signal state, and Wi-Fi IP.
+- **JLG1295-5 Electromagnetic Buzzer:** Tactile audio feedback on light switch and emergency two-tone "Wee-Woo" siren.
 
 ---
 
-## 2. Pinout Configuration
+## 2. Complete Pinout Configuration
 
-| Component | ESP32 GPIO Pin | Function | Resistor |
+| Component | Pin Label | ESP32 GPIO Pin | Function / Description |
 |---|---|---|---|
-| **NS RED LED** | GPIO 18 | North-South Stop Signal | 220 Ω to GND |
-| **NS YELLOW LED** | GPIO 19 | North-South Clearance Signal | 220 Ω to GND |
-| **NS GREEN LED** | GPIO 21 | North-South Priority Signal | 220 Ω to GND |
-| **EW RED LED** | GPIO 22 | East-West Stop Signal | 220 Ω to GND |
-| **EW YELLOW LED** | GPIO 23 | East-West Clearance Signal | 220 Ω to GND |
-| **EW GREEN LED** | GPIO 25 | East-West Normal Cycle Signal | 220 Ω to GND |
-| **OVERRIDE BUTTON** | GPIO 32 | Emergency Manual Override | Internal Pull-Up (Active LOW) |
-
-### Wiring notes
-
-- Connect each LED from its GPIO through a 220 Ω resistor to GND. The GPIO drives the LED anode.
-- Connect one side of the override push button to GPIO 32 and the other side to GND.
-- GPIO 32 uses `INPUT_PULLUP`, so the button is released HIGH and pressed LOW.
-- Power the ESP32 from a regulated 5 V USB supply. Do not power the LED loads directly from an external supply.
-- Keep the MQTT broker and ESP32 on the same Wi-Fi network. Set the Wi-Fi and broker values in `firmware/esp32-junction/src/main.cpp` before flashing.
+| **Traffic Light Module** | **GND** | **GND** | Ground (Common Cathode) |
+| **Traffic Light Module** | **R** | **GPIO 18** | Red Signal (Stop Cross Traffic) |
+| **Traffic Light Module** | **Y** | **GPIO 19** | Yellow Signal (Preemption Clearance) |
+| **Traffic Light Module** | **G** | **GPIO 23** | Green Signal (Ambulance Priority Wave) |
+| **JLG1295-5 Buzzer** | **(+)** (Long Pin / '+' mark) | **GPIO 25** | Audio output / Siren PWM |
+| **JLG1295-5 Buzzer** | **(-)** (Short Pin) | **GND** | Ground |
+| **0.96" OLED Display** | **VCC** | **3.3V** | Power |
+| **0.96" OLED Display** | **GND** | **GND** | Ground |
+| **0.96" OLED Display** | **SCL** | **GPIO 22** | I2C Clock Pin |
+| **0.96" OLED Display** | **SDA** | **GPIO 21** | I2C Data Pin |
 
 ---
 
-## 3. Safe State Transition Sequence
+## 3. Audio & Visual Behaviors
 
-```
-[Normal Cycle: EW Green, NS Red]
-               │
-               │ Ambulance priority request received over MQTT
-               ▼
-[Yellow Clearance (3s)]
-  - EW: YELLOW
-  - NS: RED
-               │
-               ▼
-[All-Red Clearance (2s)]
-  - EW: RED
-  - NS: RED (CRITICAL INVARIANT: Never two greens simultaneously!)
-               │
-               ▼
-[Green Priority (8s)]
-  - EW: RED
-  - NS: GREEN (Ambulance passes intersection)
-               │
-               ▼
-[Normal Alternating Cycle Resumed]
-```
-
----
-
-## 4. Software Signal Simulator
-
-For evaluations where physical ESP32 hardware is not wired, run the software simulator:
-```bash
-python simulator/signal_simulator.py
-```
-This Python daemon connects to the Mosquitto broker, listens to `junction/{id}/priority/request`, and executes the identical safe phase state machine with real-time state broadcasts.
+1. **Light Change Feedback:**
+   - **RED:** 1 short confirmation beep (80ms).
+   - **YELLOW:** 1 short beep (60ms).
+   - **GREEN:** Double beep (50ms - 40ms pause - 50ms) indicating corridor clear priority.
+   - **OFF:** 1 long beep (100ms) indicating power standby.
+2. **Emergency Siren Mode:**
+   - Continuous alternating two-tone siren:
+     - High tone: **960 Hz** (synchronized with RED LED flash).
+     - Low tone: **680 Hz** (synchronized with GREEN LED flash).
+   - Produces the authentic ambulance "Wee-Woo" emergency siren sound!
