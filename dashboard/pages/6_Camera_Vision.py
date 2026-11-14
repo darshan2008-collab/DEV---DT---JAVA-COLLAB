@@ -61,6 +61,43 @@ with m4:
 
 st.write("")
 
+# Force High Contrast Visibility for Streamlit Tabs
+st.markdown("""
+<style>
+div[data-baseweb="tab-list"] button,
+div[data-baseweb="tab-list"] button *,
+div[data-baseweb="tab-list"] button p,
+div[data-baseweb="tab-list"] button div,
+div[data-baseweb="tab-list"] button span,
+.stTabs [data-baseweb="tab"],
+.stTabs [data-baseweb="tab"] *,
+.stTabs [data-baseweb="tab"] p,
+.stTabs [data-baseweb="tab"] div,
+.stTabs [data-baseweb="tab"] span {
+    color: #0F172A !important;
+    font-weight: 600 !important;
+    font-size: 0.88rem !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+div[data-baseweb="tab-list"] button[aria-selected="true"],
+div[data-baseweb="tab-list"] button[aria-selected="true"] *,
+div[data-baseweb="tab-list"] button[aria-selected="true"] p,
+div[data-baseweb="tab-list"] button[aria-selected="true"] div,
+div[data-baseweb="tab-list"] button[aria-selected="true"] span,
+.stTabs [aria-selected="true"],
+.stTabs [aria-selected="true"] *,
+.stTabs [aria-selected="true"] p,
+.stTabs [aria-selected="true"] div,
+.stTabs [aria-selected="true"] span {
+    color: #0284C7 !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # 3 Main Navigation Tabs
 tab1, tab2, tab3 = st.tabs([
     "📹 Live IP Camera Monitor & AI Detection",

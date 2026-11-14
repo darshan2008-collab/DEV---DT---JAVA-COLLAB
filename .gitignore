@@ -35,6 +35,8 @@ wheels/
 
 # Streamlit
 .streamlit/
+!dashboard/.streamlit/
+!dashboard/.streamlit/config.toml
 
 # Models and Media
 *.pt

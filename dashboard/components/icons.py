@@ -387,13 +387,18 @@ GLOBAL_LIGHT_THEME_CSS = """
         line-height: inherit !important;
     }
     button[data-baseweb="tab"],
-    button[data-baseweb="tab"][aria-selected="true"] {
-        font-size: 0.85rem !important;
+    button[data-baseweb="tab"] *,
+    button[data-baseweb="tab"][aria-selected="true"],
+    button[data-baseweb="tab"][aria-selected="true"] * {
+        font-size: 0.88rem !important;
         font-weight: 600 !important;
+        color: #0F172A !important;
         transform: none !important;
         transition: none !important;
         box-shadow: none !important;
         outline: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
     div[data-testid="column"] {
         transform: none !important;
@@ -584,19 +589,73 @@ GLOBAL_LIGHT_THEME_CSS = """
         font-size: 0.74rem !important; 
         font-weight: 600 !important; 
     }
-    .stTabs [data-baseweb="tab-list"] { 
-        gap: 6px; 
-        border-bottom: 1px solid #E2E8F0; 
+    .stTabs [data-baseweb="tab-list"],
+    div[data-baseweb="tab-list"] { 
+        gap: 8px !important; 
+        border-bottom: 2px solid #CBD5E1 !important; 
+        background: transparent !important;
     }
-    .stTabs [data-baseweb="tab"] { 
-        padding: 8px 16px !important; 
-        font-size: 0.86rem !important; 
+    .stTabs [data-baseweb="tab"],
+    button[data-baseweb="tab"],
+    div[data-baseweb="tab-list"] button { 
+        padding: 9px 18px !important; 
+        font-size: 0.88rem !important; 
         font-weight: 600 !important; 
-        color: #64748B !important; 
+        color: #0F172A !important; 
+        background: transparent !important;
+        border: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
-    .stTabs [aria-selected="true"] { 
+    .stTabs [data-baseweb="tab"] *,
+    button[data-baseweb="tab"] *,
+    div[data-baseweb="tab-list"] button *,
+    .stTabs [data-baseweb="tab"] p,
+    button[data-baseweb="tab"] p,
+    div[data-baseweb="tab-list"] button p,
+    .stTabs [data-baseweb="tab"] div,
+    button[data-baseweb="tab"] div,
+    div[data-baseweb="tab-list"] button div,
+    .stTabs [data-baseweb="tab"] span,
+    button[data-baseweb="tab"] span,
+    div[data-baseweb="tab-list"] button span { 
+        color: #0F172A !important; 
+        font-weight: 600 !important; 
+        font-size: 0.88rem !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    .stTabs [data-baseweb="tab"]:hover *,
+    button[data-baseweb="tab"]:hover *,
+    div[data-baseweb="tab-list"] button:hover * {
+        color: #0284C7 !important;
+    }
+    .stTabs [aria-selected="true"],
+    button[data-baseweb="tab"][aria-selected="true"],
+    div[data-baseweb="tab-list"] button[aria-selected="true"] { 
         color: #0284C7 !important; 
-        border-bottom: 2px solid #0284C7 !important; 
+        border-bottom: 3px solid #0284C7 !important; 
+        background: #F0F9FF !important;
+        border-radius: 6px 6px 0 0 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+    .stTabs [aria-selected="true"] *,
+    button[data-baseweb="tab"][aria-selected="true"] *,
+    div[data-baseweb="tab-list"] button[aria-selected="true"] *,
+    .stTabs [aria-selected="true"] p,
+    button[data-baseweb="tab"][aria-selected="true"] p,
+    div[data-baseweb="tab-list"] button[aria-selected="true"] p,
+    .stTabs [aria-selected="true"] div,
+    button[data-baseweb="tab"][aria-selected="true"] div,
+    div[data-baseweb="tab-list"] button[aria-selected="true"] div,
+    .stTabs [aria-selected="true"] span,
+    button[data-baseweb="tab"][aria-selected="true"] span,
+    div[data-baseweb="tab-list"] button[aria-selected="true"] span { 
+        color: #0284C7 !important; 
+        font-weight: 700 !important; 
+        opacity: 1 !important;
+        visibility: visible !important;
     }
     div.stButton > button { 
         padding: 7px 16px !important; 
