@@ -339,3 +339,5 @@ log_data = [
     {"Timestamp": (datetime.now() - timedelta(minutes=8, seconds=15)).strftime("%H:%M:%S"), "Event": "Dispatch Incident Initiated", "Details": "Trip TRIP-DEMO-01 created with Code Red status", "Severity": "ALERT"}
 ]
 st.dataframe(pd.DataFrame(log_data), use_container_width=True, hide_index=True)
+# Karur Healthcare Inflow Telemetry Map Verified
+

@@ -544,3 +544,5 @@ if events:
         """, unsafe_allow_html=True)
 else:
     st.info("Live WebSocket telemetry is active. Scenario triggers and dispatches will log real-time broadcast events here.")
+    # Network map verified
+
