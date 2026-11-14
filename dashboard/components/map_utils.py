@@ -400,17 +400,21 @@ def create_network_map(
     traffic_data=None,
     active_route="Route B",
     ambulance_pos=None,
+    ambulance_location=None,
+    congested_segments=None,
     hospital_pos=None,
     show_hospitals=True,
     category_filter=None,
     zoom_start=12,
-    center_coords=None
+    center_coords=None,
+    **kwargs
 ):
     """
     Renders an interactive Folium Map centered on Karur District.
     Accurately highlights all Karur District Hospitals, Clinics, PHCs, 
     and demarcates the Karur District Boundary.
     """
+    amb_coord = ambulance_pos if ambulance_pos is not None else ambulance_location
     # Center on Karur City / District Medical Hub
     center_lat = center_coords[0] if center_coords else 10.9560
     center_lon = center_coords[1] if center_coords else 78.0760
@@ -444,6 +448,11 @@ def create_network_map(
             sid = t.get("segment_id")
             seg_congestion[sid] = t.get("congestion_level", "LOW")
             seg_speeds[sid] = t.get("speed_kmph", 40.0)
+
+    if congested_segments:
+        for cs in congested_segments:
+            seg_congestion[cs] = "HIGH"
+            seg_speeds[cs] = 15.0
 
     for seg_id in list(SEGMENT_PATHS.keys()):
         path = SEGMENT_PATHS[seg_id]
@@ -562,9 +571,9 @@ def create_network_map(
             ).add_to(m)
 
     # 5. Draw Live Moving Ambulance Marker if Active
-    if ambulance_pos:
+    if amb_coord:
         folium.Marker(
-            ambulance_pos,
+            amb_coord,
             popup="<b>Emergency Ambulance (Code Red)</b><br>Karur Green Wave Navigation Active",
             tooltip="Ambulance (Karur Corridor)",
             icon=folium.Icon(color="darkred", icon="ambulance", prefix="fa")
@@ -576,19 +585,24 @@ def create_network_map(
 def render_network_map(
     active_route="Route B",
     ambulance_location=None,
+    ambulance_pos=None,
     congested_segments=None,
     traffic_data=None,
     height=420,
     show_hospitals=True,
-    category_filter=None
+    category_filter=None,
+    **kwargs
 ):
     """Convenience helper to render Folium map inside Streamlit with full Karur District Hospital GIS overlay"""
     from streamlit_folium import st_folium
+    amb_coord = ambulance_pos if ambulance_pos is not None else ambulance_location
     m = create_network_map(
         traffic_data=traffic_data,
         active_route=active_route,
-        ambulance_pos=ambulance_location,
+        ambulance_pos=amb_coord,
+        congested_segments=congested_segments,
         show_hospitals=show_hospitals,
-        category_filter=category_filter
+        category_filter=category_filter,
+        **kwargs
     )
     return st_folium(m, width=None, height=height, returned_objects=[])
