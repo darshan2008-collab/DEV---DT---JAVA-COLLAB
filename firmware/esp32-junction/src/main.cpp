@@ -35,10 +35,14 @@ unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
 String staIpStr = "Connecting...";
 
-void beepFeedback(int durationMs = 70) {
+void beepFeedback(int durationMs) {
   digitalWrite(PIN_BUZZER, HIGH);
   delay(durationMs);
   digitalWrite(PIN_BUZZER, LOW);
+}
+
+void beepFeedback() {
+  beepFeedback(70);
 }
 
 void updateOled(String signalName) {

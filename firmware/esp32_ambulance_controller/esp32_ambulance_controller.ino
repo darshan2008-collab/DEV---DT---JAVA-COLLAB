@@ -59,11 +59,15 @@ unsigned long lastSirenToggle = 0;
 bool sirenFlip = false;
 String staIpStr = "Connecting...";
 
-// Quick tactile confirmation beep when a light is changed
-void beepFeedback(int durationMs = 70) {
+// Quick tactile confirmation beep (No default argument to prevent Arduino IDE preprocessor errors)
+void beepFeedback(int durationMs) {
   digitalWrite(PIN_BUZZER, HIGH);
   delay(durationMs);
   digitalWrite(PIN_BUZZER, LOW);
+}
+
+void beepFeedback() {
+  beepFeedback(70);
 }
 
 // Update OLED Screen using U8G2
