@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_light">
+
+    <!-- Top Executive Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/header_bg"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/title_header"
+            android:textColor="@color/text_white"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/subtitle_header"
+            android:textColor="#94A3B8"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Card 1: ESP32 Hardware Connection -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_background"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:layout_marginBottom="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/esp_connect_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ESP32 Hotspot: 192.168.4.1 | Or enter Mobile Hotspot IP"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="10dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/etEspIp"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/card_background"
+                        android:hint="192.168.4.1"
+                        android:text="192.168.4.1"
+                        android:inputType="textUri"
+                        android:padding="10dp"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/btnConnect"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="@color/medical_blue"
+                        android:text="@string/btn_test_conn"
+                        android:textColor="@color/text_white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvConnStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/status_disconnected"
+                    android:textColor="@color/signal_red"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Card 2: Live RGB Hardware Controller -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_background"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:layout_marginBottom="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/light_controller_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/light_controller_desc"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="14dp" />
+
+                <!-- Buttons Grid Row 1 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="10dp">
+
+                    <Button
+                        android:id="@+id/btnRed"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/btn_red_bg"
+                        android:text="@string/btn_red"
+                        android:textColor="@color/text_white"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/btnYellow"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/btn_yellow_bg"
+                        android:text="@string/btn_yellow"
+                        android:textColor="@color/text_white"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <!-- Buttons Grid Row 2 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="10dp">
+
+                    <Button
+                        android:id="@+id/btnGreen"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/btn_green_bg"
+                        android:text="@string/btn_green"
+                        android:textColor="@color/text_white"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/btnBlue"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/btn_blue_bg"
+                        android:text="@string/btn_blue"
+                        android:textColor="@color/text_white"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <!-- Buttons Grid Row 3 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnSiren"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/btn_siren_bg"
+                        android:text="@string/btn_siren"
+                        android:textColor="@color/text_white"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+
+                    <Button
+                        android:id="@+id/btnOff"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/btn_off_bg"
+                        android:text="@string/btn_off"
+                        android:textColor="@color/text_white"
+                        android:textStyle="bold"
+                        android:textSize="13sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Card 3: Emergency Preemption Wave -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_background"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:layout_marginBottom="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mission_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Corridor Approach: Junction J2 | Inside 100m Auto-Trigger Zone"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="12dp" />
+
+                <Button
+                    android:id="@+id/btnCorridorWave"
+                    android:layout_width="match_parent"
+                    android:layout_height="54dp"
+                    android:backgroundTint="@color/medical_blue"
+                    android:text="@string/btn_activate_corridor"
+                    android:textColor="@color/text_white"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="8dp" />
+
+                <Button
+                    android:id="@+id/btnCancelWave"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:backgroundTint="#64748B"
+                    android:text="@string/btn_cancel_corridor"
+                    android:textColor="@color/text_white"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Card 4: Terminal Response Log -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_background"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hardware Telemetry &amp; HTTP Logs"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:id="@+id/tvLogs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@color/primary_navy"
+                    android:padding="10dp"
+                    android:text="[Ready] Connect to ESP32-AMBULANCE-SIGNAL Wi-Fi to start controlling."
+                    android:textColor="#38BDF8"
+                    android:fontFamily="monospace"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

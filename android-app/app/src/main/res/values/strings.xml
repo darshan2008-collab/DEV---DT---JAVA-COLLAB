@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">Smart Ambulance</string>
+    <string name="title_header">Smart Ambulance Controller</string>
+    <string name="subtitle_header">Karur Medical District | ESP32 Edge Preemption</string>
+    <string name="esp_connect_title">ESP32 Hardware Connection</string>
+    <string name="default_esp_ip">192.168.4.1</string>
+    <string name="btn_test_conn">Ping / Connect</string>
+    <string name="status_disconnected">Status: Disconnected</string>
+    <string name="status_connected">Status: Online (200 OK)</string>
+    
+    <string name="light_controller_title">Live 4-Pin RGB LED Signal Head</string>
+    <string name="light_controller_desc">Touch any button below to instantly command the physical ESP32 LED</string>
+    
+    <string name="btn_red">RED (STOP)</string>
+    <string name="btn_yellow">YELLOW (CLEAR)</string>
+    <string name="btn_green">GREEN (AMBULANCE)</string>
+    <string name="btn_blue">BLUE LIGHT</string>
+    <string name="btn_siren">SIREN FLASH</string>
+    <string name="btn_off">TURN OFF</string>
+    
+    <string name="mission_title">Emergency Corridor Preemption</string>
+    <string name="btn_activate_corridor">TRANSMIT AMBULANCE WAVE</string>
+    <string name="btn_cancel_corridor">CANCEL / RESTORE FIXED CYCLE</string>
+</resources>
